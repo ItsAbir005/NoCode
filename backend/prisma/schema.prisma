@@ -14,6 +14,25 @@ model User {
   name      String
   email     String   @unique
   password  String
+  projects  Project[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Project {
+  id        Int       @id @default(autoincrement())
+  name      String
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id])
+  workflows Workflow[]
+  createdAt DateTime  @default(now())
+}
+
+model Workflow {
+  id          Int      @id @default(autoincrement())
+  name        String
+  projectId   Int
+  project     Project  @relation(fields: [projectId], references: [id])
+  description String?  // optional
+  createdAt   DateTime @default(now())
 }
