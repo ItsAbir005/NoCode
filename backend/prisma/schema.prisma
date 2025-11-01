@@ -10,13 +10,13 @@ datasource db {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
+  id        Int       @id @default(autoincrement())
   name      String
-  email     String   @unique
+  email     String    @unique
   password  String
-  projects  Project[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  projects  Project[] 
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
 }
 
 model Project {
@@ -24,8 +24,12 @@ model Project {
   name      String
   userId    Int
   user      User      @relation(fields: [userId], references: [id])
-  workflows Workflow[]
+  workflows Workflow[]  
+  canvas    Canvas? 
   createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+
+  @@index([userId])
 }
 
 model Workflow {
@@ -33,6 +37,19 @@ model Workflow {
   name        String
   projectId   Int
   project     Project  @relation(fields: [projectId], references: [id])
-  description String?  // optional
+  description String? 
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@index([projectId])
 }
+
+model Canvas {
+  id        Int       @id @default(autoincrement())
+  projectId Int       @unique
+  project   Project   @relation(fields: [projectId], references: [id])
+  layout    Json
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+}
+
