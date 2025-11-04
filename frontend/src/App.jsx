@@ -2,15 +2,13 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
+import CanvasEditor from './pages/CanvasEditor'; 
 
-// Protected Route Component
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('token');
-  
   if (!token) {
     return <Navigate to="/login" replace />;
   }
-  
   return children;
 }
 
@@ -25,6 +23,15 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        {/* Add this new route */}
+        <Route
+          path="/canvas/:projectId"
+          element={
+            <ProtectedRoute>
+              <CanvasEditor />
             </ProtectedRoute>
           }
         />
