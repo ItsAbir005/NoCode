@@ -15,7 +15,7 @@ app.get("/", (req, res) => res.send("No-Code Platform Backend Running"));
 app.use("/auth", authRoutes);
 app.use("/projects", projectRoutes);
 app.use("/canvas", canvasRoutes);
-app.use("/ai", aiRoutes); // Add this line
+app.use("/ai", aiRoutes); 
 
 const PORT = process.env.PORT || 8000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
