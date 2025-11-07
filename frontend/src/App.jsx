@@ -3,6 +3,7 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import CanvasEditor from './pages/CanvasEditor'; 
+import Preview from './pages/Preview';
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('token');
@@ -36,6 +37,7 @@ export default function App() {
           }
         />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/preview/:projectId" element={<Preview />} />
       </Routes>
     </BrowserRouter>
   );

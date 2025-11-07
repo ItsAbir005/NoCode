@@ -18,7 +18,7 @@ import AIChat from '../components/AIChat'; // Add this import
 export default function CanvasEditor() {
   const { projectId } = useParams();
   const navigate = useNavigate();
-  
+
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedNode, setSelectedNode] = useState(null);
@@ -201,6 +201,12 @@ export default function CanvasEditor() {
             >
               {saving ? 'Saving...' : '💾 Save Canvas'}
             </button>
+            <button
+              onClick={() => window.open(`/preview/${projectId}`, '_blank')}
+              className="bg-green-500 text-white px-6 py-2 rounded-lg hover:bg-green-600"
+            >
+              👁️ Preview
+            </button>
             {selectedNode && (
               <button
                 onClick={deleteSelectedNode}
@@ -242,7 +248,7 @@ export default function CanvasEditor() {
             className="bg-gray-100"
           >
             <Controls />
-            <MiniMap 
+            <MiniMap
               nodeColor={(node) => {
                 if (node.id === selectedNode?.id) return '#EF4444';
                 return '#3B82F6';
@@ -250,7 +256,7 @@ export default function CanvasEditor() {
               className="bg-white border-2 border-gray-200 rounded-lg"
             />
             <Background variant="dots" gap={16} size={1} color="#9CA3AF" />
-            
+
             <Panel position="top-center" className="bg-white px-4 py-2 rounded-lg shadow-md">
               <div className="text-sm font-semibold text-gray-700">
                 Components: {nodes.length} | Connections: {edges.length}
