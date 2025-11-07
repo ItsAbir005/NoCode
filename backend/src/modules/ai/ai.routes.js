@@ -1,21 +1,11 @@
-const express = require("express");
-const cors = require("cors");
-require("dotenv").config();
+const express = require('express');
+const router = express.Router();
+const controller = require('./ai.controller');
+const auth = require('../../middleware/authMiddleware');
 
-const authRoutes = require("./modules/auth/auth.routes");
-const projectRoutes = require("./modules/project/project.routes");
-const canvasRoutes = require("./modules/canvas/canvas.routes");
-const aiRoutes = require("./modules/ai/ai.routes");
+router.post('/generate-layout', auth, controller.generateLayout);
+router.post('/generate-component', auth, controller.generateComponent);
+router.post('/improve-layout', auth, controller.improveLayout);
+router.post('/suggest-components', auth, controller.suggestComponents);
 
-const app = express();
-app.use(cors());
-app.use(express.json());
-
-app.get("/", (req, res) => res.send("No-Code Platform Backend Running"));
-app.use("/auth", authRoutes);
-app.use("/projects", projectRoutes);
-app.use("/canvas", canvasRoutes);
-app.use("/ai", aiRoutes);
-
-const PORT = process.env.PORT || 8000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+module.exports = router;
