@@ -37,7 +37,8 @@ model Workflow {
   name        String
   projectId   Int
   project     Project  @relation(fields: [projectId], references: [id])
-  description String? 
+  trigger     Json?
+  actions     Json?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
 

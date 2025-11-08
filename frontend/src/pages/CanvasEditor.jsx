@@ -13,7 +13,15 @@ import 'reactflow/dist/style.css';
 import api from '../api/client';
 import ComponentPalette from '../components/ComponentPalette';
 import PropertiesPanel from '../components/PropertiesPanel';
-import AIChat from '../components/AIChat'; // Add this import
+import AIChat from '../components/AIChat';
+import WorkflowEditor from '../components/WorkflowEditor';
+
+// Add Zap icon component
+const Zap = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+  </svg>
+);
 
 export default function CanvasEditor() {
   const { projectId } = useParams();
@@ -24,7 +32,8 @@ export default function CanvasEditor() {
   const [selectedNode, setSelectedNode] = useState(null);
   const [project, setProject] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [showAI, setShowAI] = useState(true); // Add this
+  const [showAI, setShowAI] = useState(true);
+  const [showWorkflowEditor, setShowWorkflowEditor] = useState(false);
 
   useEffect(() => {
     loadProject();
@@ -76,7 +85,6 @@ export default function CanvasEditor() {
     setSelectedNode(node);
   }, []);
 
-  // Add these AI handler functions
   const handleAILayoutGenerated = (layout) => {
     setNodes(layout.nodes || []);
     setEdges(layout.edges || []);
@@ -178,6 +186,13 @@ export default function CanvasEditor() {
             >
               ← Back
             </button>
+            <button
+              onClick={() => setShowWorkflowEditor(true)}
+              className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-2 rounded-lg font-semibold hover:shadow-lg flex items-center gap-2"
+            >
+              <Zap className="w-5 h-5" />
+              Workflows
+            </button>
             <div>
               <h1 className="text-2xl font-bold text-gray-800">
                 {project?.name || 'Canvas Editor'}
@@ -187,7 +202,6 @@ export default function CanvasEditor() {
           </div>
 
           <div className="flex gap-3">
-            {/* Add AI Toggle Button */}
             <button
               onClick={() => setShowAI(!showAI)}
               className="bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 transition flex items-center gap-2"
@@ -265,6 +279,15 @@ export default function CanvasEditor() {
             </Panel>
           </ReactFlow>
         </div>
+
+        {/* Workflow Editor Modal */}
+        {showWorkflowEditor && (
+          <WorkflowEditor
+            projectId={projectId}
+            nodes={nodes}
+            onClose={() => setShowWorkflowEditor(false)}
+          />
+        )}
 
         {/* Properties Panel */}
         {selectedNode && (
