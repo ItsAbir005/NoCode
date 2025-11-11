@@ -301,11 +301,362 @@ export default function WorkflowEditor({ projectId, nodes, onClose }) {
                                 className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:border-green-500 focus:outline-none"
                               >
                                 <option value="toggle_visibility">Show/Hide Component</option>
-                                <option value="navigate">Navigate to Page</option>
                                 <option value="set_value">Set Component Value</option>
+                                <option value="navigate">Navigate to Page</option>
                                 <option value="alert">Show Alert</option>
+                                <option value="api_call">Call API</option>
+                                <option value="validate_input">Validate Input</option>
+                                <option value="conditional">Conditional (If/Else)</option>
+                                <option value="show_toast">Show Toast Notification</option>
+                                <option value="save_storage">Save to Local Storage</option>
+                                <option value="load_storage">Load from Local Storage</option>
+                                <option value="delay">Delay (Wait)</option>
                               </select>
                             </div>
+
+                            {action.type === 'set_value' && (
+                              <>
+                                <div>
+                                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                    Target Component *
+                                  </label>
+                                  <select
+                                    value={action.targetId}
+                                    onChange={(e) => updateAction(idx, 'targetId', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                                  >
+                                    <option value="">Select component...</option>
+                                    {nodes.map(node => (
+                                      <option key={node.id} value={node.id}>
+                                        {node.data.label} ({node.id})
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                    New Value
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={action.value || ''}
+                                    onChange={(e) => updateAction(idx, 'value', e.target.value)}
+                                    placeholder="Value to set"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                                  />
+                                </div>
+                              </>
+                            )}
+
+                            {action.type === 'api_call' && (
+                              <>
+                                <div>
+                                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                    Method
+                                  </label>
+                                  <select
+                                    value={action.method || 'GET'}
+                                    onChange={(e) => updateAction(idx, 'method', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                                  >
+                                    <option value="GET">GET</option>
+                                    <option value="POST">POST</option>
+                                    <option value="PUT">PUT</option>
+                                    <option value="DELETE">DELETE</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                    URL *
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={action.url || ''}
+                                    onChange={(e) => updateAction(idx, 'url', e.target.value)}
+                                    placeholder="https://api.example.com/data"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                    Body (JSON for POST/PUT)
+                                  </label>
+                                  <textarea
+                                    value={action.body || ''}
+                                    onChange={(e) => updateAction(idx, 'body', e.target.value)}
+                                    placeholder='{"key": "value"}'
+                                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                                    rows={3}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                    Save Response To Component (optional)
+                                  </label>
+                                  <select
+                                    value={action.saveToComponent || ''}
+                                    onChange={(e) => updateAction(idx, 'saveToComponent', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                                  >
+                                    <option value="">Don't save</option>
+                                    {nodes.filter(n => n.data.type === 'Text').map(node => (
+                                      <option key={node.id} value={node.id}>
+                                        {node.data.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </>
+                            )}
+
+                            {action.type === 'validate_input' && (
+                              <>
+                                <div>
+                                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                    Input Component *
+                                  </label>
+                                  <select
+                                    value={action.targetId}
+                                    onChange={(e) => updateAction(idx, 'targetId', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                                  >
+                                    <option value="">Select input...</option>
+                                    {nodes.filter(n => n.data.type === 'Input').map(node => (
+                                      <option key={node.id} value={node.id}>
+                                        {node.data.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                    Validation Type
+                                  </label>
+                                  <select
+                                    value={action.validationType || 'required'}
+                                    onChange={(e) => updateAction(idx, 'validationType', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                                  >
+                                    <option value="required">Required (not empty)</option>
+                                    <option value="email">Valid Email</option>
+                                    <option value="minLength">Minimum Length</option>
+                                    <option value="maxLength">Maximum Length</option>
+                                    <option value="number">Numbers Only</option>
+                                    <option value="regex">Custom Regex</option>
+                                  </select>
+                                </div>
+                                {action.validationType === 'minLength' && (
+                                  <div>
+                                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                      Minimum Length
+                                    </label>
+                                    <input
+                                      type="number"
+                                      value={action.minLength || 1}
+                                      onChange={(e) => updateAction(idx, 'minLength', parseInt(e.target.value))}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                                    />
+                                  </div>
+                                )}
+                                {action.validationType === 'regex' && (
+                                  <div>
+                                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                      Regex Pattern
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={action.pattern || ''}
+                                      onChange={(e) => updateAction(idx, 'pattern', e.target.value)}
+                                      placeholder="^[A-Za-z]+$"
+                                      className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                                    />
+                                  </div>
+                                )}
+                                <div>
+                                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                    Error Message
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={action.errorMessage || ''}
+                                    onChange={(e) => updateAction(idx, 'errorMessage', e.target.value)}
+                                    placeholder="This field is required"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                                  />
+                                </div>
+                              </>
+                            )}
+
+                            {action.type === 'conditional' && (
+                              <>
+                                <div>
+                                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                    Condition Component
+                                  </label>
+                                  <select
+                                    value={action.conditionComponent || ''}
+                                    onChange={(e) => updateAction(idx, 'conditionComponent', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                                  >
+                                    <option value="">Select component...</option>
+                                    {nodes.map(node => (
+                                      <option key={node.id} value={node.id}>
+                                        {node.data.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                    Operator
+                                  </label>
+                                  <select
+                                    value={action.operator || 'equals'}
+                                    onChange={(e) => updateAction(idx, 'operator', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                                  >
+                                    <option value="equals">Equals (==)</option>
+                                    <option value="notEquals">Not Equals (!=)</option>
+                                    <option value="contains">Contains</option>
+                                    <option value="isEmpty">Is Empty</option>
+                                    <option value="isNotEmpty">Is Not Empty</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                    Compare Value
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={action.compareValue || ''}
+                                    onChange={(e) => updateAction(idx, 'compareValue', e.target.value)}
+                                    placeholder="Value to compare"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                                  />
+                                </div>
+                                <div className="col-span-2 bg-yellow-50 border border-yellow-300 rounded p-2">
+                                  <p className="text-xs text-yellow-800">
+                                    ℹ️ If condition is true, next action runs. Otherwise, it's skipped.
+                                  </p>
+                                </div>
+                              </>
+                            )}
+
+                            {action.type === 'show_toast' && (
+                              <>
+                                <div>
+                                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                    Toast Type
+                                  </label>
+                                  <select
+                                    value={action.toastType || 'success'}
+                                    onChange={(e) => updateAction(idx, 'toastType', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                                  >
+                                    <option value="success">Success (Green)</option>
+                                    <option value="error">Error (Red)</option>
+                                    <option value="info">Info (Blue)</option>
+                                    <option value="warning">Warning (Yellow)</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                    Message *
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={action.message || ''}
+                                    onChange={(e) => updateAction(idx, 'message', e.target.value)}
+                                    placeholder="Operation successful!"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                                  />
+                                </div>
+                              </>
+                            )}
+
+                            {action.type === 'save_storage' && (
+                              <>
+                                <div>
+                                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                    Key Name *
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={action.storageKey || ''}
+                                    onChange={(e) => updateAction(idx, 'storageKey', e.target.value)}
+                                    placeholder="userData"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                    Value from Component
+                                  </label>
+                                  <select
+                                    value={action.sourceComponent || ''}
+                                    onChange={(e) => updateAction(idx, 'sourceComponent', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                                  >
+                                    <option value="">Select component...</option>
+                                    {nodes.map(node => (
+                                      <option key={node.id} value={node.id}>
+                                        {node.data.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </>
+                            )}
+
+                            {action.type === 'load_storage' && (
+                              <>
+                                <div>
+                                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                    Key Name *
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={action.storageKey || ''}
+                                    onChange={(e) => updateAction(idx, 'storageKey', e.target.value)}
+                                    placeholder="userData"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                    Load Into Component
+                                  </label>
+                                  <select
+                                    value={action.targetComponent || ''}
+                                    onChange={(e) => updateAction(idx, 'targetComponent', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                                  >
+                                    <option value="">Select component...</option>
+                                    {nodes.map(node => (
+                                      <option key={node.id} value={node.id}>
+                                        {node.data.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </>
+                            )}
+
+                            {action.type === 'delay' && (
+                              <div>
+                                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                  Delay (milliseconds)
+                                </label>
+                                <input
+                                  type="number"
+                                  value={action.delay || 1000}
+                                  onChange={(e) => updateAction(idx, 'delay', parseInt(e.target.value))}
+                                  placeholder="1000"
+                                  className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">1000ms = 1 second</p>
+                              </div>
+                            )}
 
                             {action.type === 'toggle_visibility' && (
                               <>

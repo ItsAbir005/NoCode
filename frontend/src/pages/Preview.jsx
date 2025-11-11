@@ -21,7 +21,7 @@ const ArrowLeft = ({ className }) => (
 export default function Preview() {
   const { projectId } = useParams();
   const navigate = useNavigate();
-  
+  const [toasts, setToasts] = useState([]);
   const [canvas, setCanvas] = useState(null);
   const [workflows, setWorkflows] = useState([]);
   const [componentStates, setComponentStates] = useState({});
@@ -38,17 +38,17 @@ export default function Preview() {
         api.get(`/canvas/${projectId}`),
         api.get(`/projects/${projectId}/workflows`)
       ]);
-      
+
       setCanvas(canvasRes.data.canvas);
       setWorkflows(workflowsRes.data);
 
       // Initialize component states (all visible by default)
       const initialStates = {};
       canvasRes.data.canvas?.layout?.nodes?.forEach(node => {
-        initialStates[node.id] = { 
-          visible: true, 
+        initialStates[node.id] = {
+          visible: true,
           value: '',
-          disabled: false 
+          disabled: false
         };
       });
       setComponentStates(initialStates);
@@ -60,28 +60,72 @@ export default function Preview() {
     }
   };
 
-  const handleEvent = (componentId, eventType) => {
+  const handleEvent = async (componentId, eventType) => {
     console.log('🎯 Event triggered:', componentId, eventType);
-    
-    // Find workflows triggered by this event
+
     const triggeredWorkflows = workflows.filter(
       w => w.trigger.componentId === componentId && w.trigger.event === eventType
     );
 
     console.log('⚡ Triggered workflows:', triggeredWorkflows.length);
 
-    // Execute each workflow's actions
-    triggeredWorkflows.forEach(workflow => {
+    for (const workflow of triggeredWorkflows) {
       console.log('🔄 Executing workflow:', workflow.name);
-      workflow.actions.forEach(action => {
-        executeAction(action);
-      });
-    });
+
+      for (let i = 0; i < workflow.actions.length; i++) {
+        const action = workflow.actions[i];
+
+        // Execute action and check if we should continue
+        const shouldContinue = await executeAction(action);
+
+        // If validation failed or condition not met, stop workflow
+        if (shouldContinue === false) {
+          console.log('🛑 Workflow stopped at action', i + 1);
+          break;
+        }
+      }
+    }
   };
 
-  const executeAction = (action) => {
-    console.log('✨ Executing action:', action.type, '→', action.targetId);
-    
+  const showToast = (message, type = 'success') => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 3000);
+  };
+
+  const executeAction = async (action, skipCondition = false) => {
+    console.log('✨ Executing action:', action.type);
+
+    // Handle conditional logic
+    if (action.type === 'conditional' && !skipCondition) {
+      const componentState = componentStates[action.conditionComponent];
+      const value = componentState?.value || '';
+      let conditionMet = false;
+
+      switch (action.operator) {
+        case 'equals':
+          conditionMet = value === action.compareValue;
+          break;
+        case 'notEquals':
+          conditionMet = value !== action.compareValue;
+          break;
+        case 'contains':
+          conditionMet = value.includes(action.compareValue);
+          break;
+        case 'isEmpty':
+          conditionMet = value.trim() === '';
+          break;
+        case 'isNotEmpty':
+          conditionMet = value.trim() !== '';
+          break;
+      }
+
+      console.log('🔍 Condition check:', conditionMet);
+      return conditionMet; // Return whether condition was met
+    }
+
     switch (action.type) {
       case 'toggle_visibility':
         setComponentStates(prev => ({
@@ -91,7 +135,7 @@ export default function Preview() {
             visible: action.visible
           }
         }));
-        console.log('👁️ Visibility changed:', action.targetId, '→', action.visible);
+        console.log('👁️ Visibility:', action.targetId, '→', action.visible);
         break;
 
       case 'set_value':
@@ -102,6 +146,77 @@ export default function Preview() {
             value: action.value
           }
         }));
+        console.log('📝 Set value:', action.targetId, '→', action.value);
+        break;
+
+      case 'api_call':
+        try {
+          console.log('🌐 API Call:', action.method, action.url);
+          const options = {
+            method: action.method || 'GET',
+            headers: { 'Content-Type': 'application/json' }
+          };
+
+          if (action.body && (action.method === 'POST' || action.method === 'PUT')) {
+            options.body = action.body;
+          }
+
+          const response = await fetch(action.url, options);
+          const data = await response.json();
+
+          console.log('✅ API Response:', data);
+
+          // Save response to component if specified
+          if (action.saveToComponent) {
+            setComponentStates(prev => ({
+              ...prev,
+              [action.saveToComponent]: {
+                ...prev[action.saveToComponent],
+                value: JSON.stringify(data, null, 2)
+              }
+            }));
+          }
+
+          showToast('API call successful!', 'success');
+        } catch (error) {
+          console.error('❌ API Error:', error);
+          showToast('API call failed: ' + error.message, 'error');
+        }
+        break;
+
+      case 'validate_input':
+        const inputState = componentStates[action.targetId];
+        const inputValue = inputState?.value || '';
+        let isValid = true;
+        let errorMsg = action.errorMessage || 'Validation failed';
+
+        switch (action.validationType) {
+          case 'required':
+            isValid = inputValue.trim() !== '';
+            break;
+          case 'email':
+            isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inputValue);
+            errorMsg = action.errorMessage || 'Invalid email format';
+            break;
+          case 'minLength':
+            isValid = inputValue.length >= (action.minLength || 1);
+            errorMsg = action.errorMessage || `Minimum ${action.minLength} characters required`;
+            break;
+          case 'number':
+            isValid = /^\d+$/.test(inputValue);
+            errorMsg = action.errorMessage || 'Only numbers allowed';
+            break;
+          case 'regex':
+            isValid = new RegExp(action.pattern).test(inputValue);
+            break;
+        }
+
+        if (!isValid) {
+          showToast(errorMsg, 'error');
+          return false; // Stop workflow execution
+        } else {
+          showToast('Validation passed!', 'success');
+        }
         break;
 
       case 'navigate':
@@ -109,16 +224,47 @@ export default function Preview() {
         break;
 
       case 'alert':
-        alert(action.message || 'Hello!');
+        alert(action.message || 'Alert!');
+        break;
+
+      case 'show_toast':
+        showToast(action.message, action.toastType || 'success');
+        break;
+
+      case 'save_storage':
+        const saveValue = componentStates[action.sourceComponent]?.value || '';
+        localStorage.setItem(action.storageKey, saveValue);
+        console.log('💾 Saved to storage:', action.storageKey, '→', saveValue);
+        showToast('Data saved!', 'success');
+        break;
+
+      case 'load_storage':
+        const loadedValue = localStorage.getItem(action.storageKey) || '';
+        setComponentStates(prev => ({
+          ...prev,
+          [action.targetComponent]: {
+            ...prev[action.targetComponent],
+            value: loadedValue
+          }
+        }));
+        console.log('📂 Loaded from storage:', action.storageKey, '→', loadedValue);
+        showToast('Data loaded!', 'info');
+        break;
+
+      case 'delay':
+        console.log('⏱️ Waiting', action.delay, 'ms...');
+        await new Promise(resolve => setTimeout(resolve, action.delay || 1000));
         break;
 
       default:
-        console.warn('Unknown action type:', action.type);
+        console.warn('Unknown action:', action.type);
     }
+
+    return true; // Continue workflow
   };
 
   const getViewportWidth = () => {
-    switch(viewMode) {
+    switch (viewMode) {
       case 'mobile': return '375px';
       case 'tablet': return '768px';
       case 'desktop': return '100%';
@@ -128,7 +274,7 @@ export default function Preview() {
 
   const renderComponent = (node) => {
     const state = componentStates[node.id] || { visible: true, value: '' };
-    
+
     // If component is hidden, don't render it
     if (!state.visible) {
       console.log('🚫 Component hidden:', node.id);
@@ -136,14 +282,14 @@ export default function Preview() {
     }
 
     const { type, props } = node.data;
-    
-    switch(type) {
+
+    switch (type) {
       case 'Button':
         return (
-          <button 
+          <button
             onClick={() => handleEvent(node.id, 'click')}
             className="px-6 py-3 rounded-lg font-semibold transition hover:shadow-lg hover:scale-105 active:scale-95"
-            style={{ 
+            style={{
               backgroundColor: props.color || '#3B82F6',
               color: 'white',
               fontSize: props.size === 'large' ? '18px' : props.size === 'small' ? '14px' : '16px'
@@ -152,7 +298,7 @@ export default function Preview() {
             {props.text || 'Button'}
           </button>
         );
-        
+
       case 'Input':
         return (
           <div className="mb-4">
@@ -161,7 +307,7 @@ export default function Preview() {
                 {props.label}
               </label>
             )}
-            <input 
+            <input
               type={props.type || 'text'}
               placeholder={props.placeholder || 'Enter text...'}
               value={state.value || ''}
@@ -176,27 +322,27 @@ export default function Preview() {
             />
           </div>
         );
-        
+
       case 'Text':
         return (
-          <p style={{ 
-            fontSize: (props.fontSize || '16') + 'px', 
+          <p style={{
+            fontSize: (props.fontSize || '16') + 'px',
             color: props.color || '#000000',
             fontWeight: props.bold ? 'bold' : 'normal'
           }}>
             {props.content || 'Sample text'}
           </p>
         );
-        
+
       case 'Image':
         return (
-          <img 
-            src={props.url || 'https://via.placeholder.com/150'} 
+          <img
+            src={props.url || 'https://via.placeholder.com/150'}
             alt={props.alt || 'Image'}
             className="max-w-full h-auto rounded-lg shadow-md"
           />
         );
-        
+
       case 'Form':
         return (
           <div className="border-2 border-gray-300 rounded-lg p-6 bg-white shadow-sm">
@@ -216,7 +362,7 @@ export default function Preview() {
                   />
                 </div>
               ))}
-              <button 
+              <button
                 type="submit"
                 className="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600"
               >
@@ -228,9 +374,9 @@ export default function Preview() {
 
       case 'Container':
         return (
-          <div 
+          <div
             className="border-2 border-dashed border-gray-400 rounded-lg p-6"
-            style={{ 
+            style={{
               width: props.width || '100%',
               minHeight: props.height || '100px',
               backgroundColor: props.background || '#F3F4F6'
@@ -239,7 +385,7 @@ export default function Preview() {
             <p className="text-gray-500 text-center">Container</p>
           </div>
         );
-        
+
       default:
         return (
           <div className="p-4 border-2 border-gray-300 rounded-lg bg-gray-50">
@@ -288,31 +434,28 @@ export default function Preview() {
           <div className="flex gap-2 bg-gray-100 p-1 rounded-lg">
             <button
               onClick={() => setViewMode('mobile')}
-              className={`px-4 py-2 rounded-lg font-semibold text-sm transition ${
-                viewMode === 'mobile' 
-                  ? 'bg-blue-500 text-white shadow-md' 
-                  : 'text-gray-600 hover:bg-gray-200'
-              }`}
+              className={`px-4 py-2 rounded-lg font-semibold text-sm transition ${viewMode === 'mobile'
+                ? 'bg-blue-500 text-white shadow-md'
+                : 'text-gray-600 hover:bg-gray-200'
+                }`}
             >
               📱 Mobile
             </button>
             <button
               onClick={() => setViewMode('tablet')}
-              className={`px-4 py-2 rounded-lg font-semibold text-sm transition ${
-                viewMode === 'tablet' 
-                  ? 'bg-blue-500 text-white shadow-md' 
-                  : 'text-gray-600 hover:bg-gray-200'
-              }`}
+              className={`px-4 py-2 rounded-lg font-semibold text-sm transition ${viewMode === 'tablet'
+                ? 'bg-blue-500 text-white shadow-md'
+                : 'text-gray-600 hover:bg-gray-200'
+                }`}
             >
               📱 Tablet
             </button>
             <button
               onClick={() => setViewMode('desktop')}
-              className={`px-4 py-2 rounded-lg font-semibold text-sm transition ${
-                viewMode === 'desktop' 
-                  ? 'bg-blue-500 text-white shadow-md' 
-                  : 'text-gray-600 hover:bg-gray-200'
-              }`}
+              className={`px-4 py-2 rounded-lg font-semibold text-sm transition ${viewMode === 'desktop'
+                ? 'bg-blue-500 text-white shadow-md'
+                : 'text-gray-600 hover:bg-gray-200'
+                }`}
             >
               💻 Desktop
             </button>
@@ -322,10 +465,10 @@ export default function Preview() {
 
       {/* Preview Area */}
       <div className="flex justify-center p-8">
-        <div 
+        <div
           className="bg-white rounded-xl shadow-2xl p-8 transition-all duration-300"
-          style={{ 
-            width: getViewportWidth(), 
+          style={{
+            width: getViewportWidth(),
             minHeight: '600px'
           }}
         >
@@ -337,7 +480,7 @@ export default function Preview() {
           ) : (
             <div className="space-y-6">
               {canvas?.layout?.nodes?.map(node => (
-                <div 
+                <div
                   key={node.id}
                   className="transition-all duration-300"
                 >
@@ -358,6 +501,22 @@ export default function Preview() {
           <p>Hidden components: {Object.values(componentStates).filter(s => !s.visible).length}</p>
         </div>
       )}
+      {/* Toast Notifications */}
+      <div className="fixed top-4 right-4 z-50 space-y-2">
+        {toasts.map(toast => (
+          <div
+            key={toast.id}
+            className={`px-6 py-4 rounded-lg shadow-lg text-white font-semibold animate-slide-in ${toast.type === 'success' ? 'bg-green-500' :
+                toast.type === 'error' ? 'bg-red-500' :
+                  toast.type === 'warning' ? 'bg-yellow-500' :
+                    'bg-blue-500'
+              }`}
+          >
+            {toast.message}
+          </div>
+        ))}
+      </div>
     </div>
+
   );
 }
