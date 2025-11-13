@@ -18,7 +18,9 @@
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "jszip": "^3.10.1",
-    "node-fetch": "^3.3.2"
+    "node-fetch": "^3.3.2",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0"
   },
   "devDependencies": {
     "prisma": "^6.18.0"
