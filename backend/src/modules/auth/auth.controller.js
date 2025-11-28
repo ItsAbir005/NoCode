@@ -27,3 +27,15 @@ exports.getUser = async (req, res) => {
     res.status(401).json({ error: err.message });
   }
 };
+exports.googleCallback = async (req, res) => {
+  try {
+    const token = await service.googleLogin({
+      googleId: req.user.id,
+      name: req.user.displayName,
+      email: req.user.emails[0].value,
+    });
+    res.redirect(`${process.env.CLIENT_URL}/auth/callback?token=${token}`);
+  } catch (err) {
+    res.redirect(`${process.env.CLIENT_URL}/login?error=${err.message}`);
+  }
+};

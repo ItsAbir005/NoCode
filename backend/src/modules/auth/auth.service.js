@@ -19,7 +19,9 @@ exports.signup = async ({ name, email, password }) => {
 exports.login = async ({ email, password }) => {
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) throw new Error("Invalid credentials");
-
+  if (user.provider && !user.password) {
+    throw new Error(`Please login using ${user.provider}`);
+  }
   const valid = await bcrypt.compare(password, user.password);
   if (!valid) throw new Error("Invalid credentials");
 
@@ -28,7 +30,6 @@ exports.login = async ({ email, password }) => {
 };
 exports.googleLogin = async ({ googleId, name, email }) => {
   let user = await prisma.user.findUnique({ where: { email } });
-
   if (!user) {
     user = await prisma.user.create({
       data: {
@@ -38,8 +39,19 @@ exports.googleLogin = async ({ googleId, name, email }) => {
         providerId: googleId,
       },
     });
+  } else if (user.provider !== "google" && user.password) {
+    user = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        provider: "google",
+        providerId: googleId,
+      },
+    });
   }
-  const token = jwt.sign({ id: user.id, email: user.email }, SECRET, { expiresIn: "7d" });
+
+  const token = jwt.sign({ id: user.id, email: user.email }, SECRET, { 
+    expiresIn: "7d" 
+  });
   return token;
 };
 exports.getUser = async (authHeader) => {
@@ -47,5 +59,10 @@ exports.getUser = async (authHeader) => {
   const token = authHeader.split(" ")[1];
   const decoded = jwt.verify(token, SECRET);
   const user = await prisma.user.findUnique({ where: { id: decoded.id } });
-  return { id: user.id, email: user.email, name: user.name };
+  return { 
+    id: user.id, 
+    email: user.email, 
+    name: user.name,
+    provider: user.provider 
+  };
 };
