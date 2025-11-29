@@ -1,6 +1,7 @@
 // backend/src/modules/auth/auth.routes.js
 const express = require("express");
 const router = express.Router();
+const passport = require("passport");
 const controller = require("./auth.controller");
 
 router.post("/signup", controller.signup);
