@@ -1,7 +1,13 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const { Pool } = require('pg');
+const { PrismaPg } = require('@prisma/adapter-pg');
+const { PrismaClient } = require("../../generated/prisma");
+const connectionString = process.env.DATABASE_URL;
+const pool = new Pool({ connectionString });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
+
 const SECRET = process.env.JWT_SECRET;
 
 exports.signup = async ({ name, email, password }) => {
@@ -28,6 +34,7 @@ exports.login = async ({ email, password }) => {
   const token = jwt.sign({ id: user.id, email: user.email }, SECRET, { expiresIn: "7d" });
   return token;
 };
+
 exports.googleLogin = async ({ googleId, name, email }) => {
   let user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
@@ -54,6 +61,7 @@ exports.googleLogin = async ({ googleId, name, email }) => {
   });
   return token;
 };
+
 exports.getUser = async (authHeader) => {
   if (!authHeader) throw new Error("Missing token");
   const token = authHeader.split(" ")[1];
