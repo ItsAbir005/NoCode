@@ -8,15 +8,40 @@ datasource db {
 }
 
 model User {
-  id         String   @id @default(uuid())
-  email      String   @unique
+  id         String    @id @default(uuid())
+  email      String    @unique
   name       String?
   password   String?
   provider   String? 
   providerId String? 
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  
+  projects   Project[]
 
   @@index([email])
   @@index([providerId])
+}
+
+model Project {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  thumbnail   String?
+  status      String   @default("draft")
+  pages       Json     @default("[]")
+  components  Json     @default("{}")
+  workflows   Json     @default("{}")
+  database    Json     @default("{}")
+  settings    Json     @default("{}")
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
 }
