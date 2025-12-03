@@ -5,6 +5,8 @@ const Dashboard = () => {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newProject, setNewProject] = useState({ name: '', description: '' });
+  const [creating, setCreating] = useState(false);
   const API_URL = 'http://localhost:8000';
 
   const handleNavigate = (path) => {
@@ -13,6 +15,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchUserData();
+    fetchProjects();
   }, []);
 
   const fetchUserData = async () => {
@@ -35,24 +38,120 @@ const Dashboard = () => {
 
       const data = await response.json();
       setUser(data.user);
-      // Mock projects for now
-      setProjects([
-        { id: 1, name: 'E-Commerce Store', description: 'Online shopping platform', updatedAt: '2 hours ago', status: 'active' },
-        { id: 2, name: 'Task Manager', description: 'Team productivity app', updatedAt: '1 day ago', status: 'active' },
-        { id: 3, name: 'Blog Platform', description: 'Content management system', updatedAt: '3 days ago', status: 'draft' }
-      ]);
     } catch (error) {
       console.error('Error fetching user data:', error);
       localStorage.removeItem('token');
       handleNavigate('/login');
+    }
+  };
+
+  const fetchProjects = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      const response = await fetch(`${API_URL}/projects`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch projects');
+      }
+
+      const data = await response.json();
+      setProjects(data.projects || []);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
     } finally {
       setLoading(false);
     }
   };
 
+  const formatTimeAgo = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const seconds = Math.floor((now - date) / 1000);
+    
+    if (seconds < 60) return 'just now';
+    if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
+    if (seconds < 604800) return `${Math.floor(seconds / 86400)} days ago`;
+    return date.toLocaleDateString();
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     handleNavigate('/login');
+  };
+
+  const handleCreateProject = async (e) => {
+    e.preventDefault();
+    
+    if (!newProject.name.trim()) {
+      alert('Project name is required');
+      return;
+    }
+
+    setCreating(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/projects`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(newProject)
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to create project');
+      }
+
+      const data = await response.json();
+      
+      // Add new project to list
+      setProjects([data.project, ...projects]);
+      
+      // Reset form and close modal
+      setNewProject({ name: '', description: '' });
+      setShowCreateModal(false);
+      
+      // Navigate to project editor
+      handleNavigate(`/projects/${data.project.id}/edit`);
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleDeleteProject = async (projectId) => {
+    if (!confirm('Are you sure you want to delete this project?')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/projects/${projectId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete project');
+      }
+
+      // Remove project from list
+      setProjects(projects.filter(p => p.id !== projectId));
+    } catch (error) {
+      alert(error.message);
+    }
   };
 
   if (loading) {
@@ -252,12 +351,28 @@ const Dashboard = () => {
                   </h3>
                   <p className="text-sm text-gray-600 mb-4">{project.description}</p>
                   <div className="flex items-center justify-between text-sm text-gray-500">
-                    <span>Updated {project.updatedAt}</span>
-                    <button className="text-indigo-600 hover:text-indigo-700">
-                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </button>
+                    <span>Updated {formatTimeAgo(project.updatedAt)}</span>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => handleNavigate(`/projects/${project.id}/edit`)}
+                        className="text-indigo-600 hover:text-indigo-700"
+                      >
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </button>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteProject(project.id);
+                        }}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -334,13 +449,16 @@ const Dashboard = () => {
                 </svg>
               </button>
             </div>
-            <form className="space-y-4">
+            <form className="space-y-4" onSubmit={handleCreateProject}>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Project Name</label>
                 <input
                   type="text"
                   placeholder="My Awesome App"
+                  value={newProject.name}
+                  onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
+                  required
                 />
               </div>
               <div>
@@ -348,22 +466,39 @@ const Dashboard = () => {
                 <textarea
                   placeholder="What does your app do?"
                   rows="3"
+                  value={newProject.description}
+                  onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
                 ></textarea>
               </div>
               <div className="flex gap-3 pt-4">
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    setNewProject({ name: '', description: '' });
+                  }}
                   className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                  disabled={creating}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                  disabled={creating}
+                  className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  Create Project
+                  {creating ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Creating...
+                    </>
+                  ) : (
+                    'Create Project'
+                  )}
                 </button>
               </div>
             </form>
