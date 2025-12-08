@@ -77,13 +77,14 @@ const ProjectEditor = ({ projectId }) => {
       const data = await response.json();
       setProject(data.project);
       
-      // Load pages if they exist
       if (data.project.pages && Array.isArray(data.project.pages) && data.project.pages.length > 0) {
         setPages(data.project.pages);
-        setSelectedPage(data.project.pages[0]);
+        const initialPage = data.project.pages[0];
+        setSelectedPage(initialPage);
+        if (data.project.components && data.project.components[initialPage.id]) {
+          setComponents(data.project.components[initialPage.id]);
+        }
       }
-
-      // Load workflows if they exist
       if (data.project.workflows) {
         setWorkflows(data.project.workflows);
       }
@@ -151,7 +152,7 @@ const ProjectEditor = ({ projectId }) => {
       props: { ...draggedComponent.defaultProps },
       position: { x, y },
       style: {},
-      workflows: []
+
     };
 
     setComponents([...components, newComponent]);
@@ -159,7 +160,6 @@ const ProjectEditor = ({ projectId }) => {
     setSelectedComponent(newComponent);
   };
 
-  // Canvas Component Dragging (Arrange)
   const handleCanvasComponentMouseDown = (e, component) => {
     if (previewMode) return;
     e.stopPropagation();
@@ -314,7 +314,7 @@ const ProjectEditor = ({ projectId }) => {
 
   const handlePageSelect = (page) => {
     setSelectedPage(page);
-    setComponents([]);
+    setComponents(project?.components?.[page.id] || []);
     setSelectedComponent(null);
   };
 
@@ -354,16 +354,6 @@ const ProjectEditor = ({ projectId }) => {
   };
 
   const attachWorkflowToComponent = (componentId, workflowId, eventType) => {
-    setComponents(components.map(comp => {
-      if (comp.id === componentId) {
-        const workflows = comp.workflows || [];
-        return {
-          ...comp,
-          workflows: [...workflows, { workflowId, eventType }]
-        };
-      }
-      return comp;
-    }));
   };
 
   // Component Renderer
@@ -371,6 +361,7 @@ const ProjectEditor = ({ projectId }) => {
     const isSelected = selectedComponent?.id === component.id;
     const isHovered = hoveredComponent?.id === component.id;
     const isBeingDragged = draggedCanvasComponent?.id === component.id;
+    const attachedWorkflows = workflows.filter(w => w.trigger.componentId === component.id);
 
     const componentStyle = {
       left: `${component.position.x}px`,
@@ -528,12 +519,13 @@ const ProjectEditor = ({ projectId }) => {
             </div>
           </div>
         )}
-        {/* Workflow indicator */}
-        {!previewMode && component.workflows && component.workflows.length > 0 && (
+
+        {!previewMode && attachedWorkflows.length > 0 && (
           <div className="absolute -top-2 -right-2 bg-purple-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-lg">
-            {component.workflows.length}
+            {attachedWorkflows.length}
           </div>
         )}
+        
         {content}
       </div>
     );
