@@ -29,6 +29,11 @@ const ProjectEditor = ({ projectId }) => {
   const [draggedComponent, setDraggedComponent] = useState(null);
   const [hoveredComponent, setHoveredComponent] = useState(null);
 
+  // Canvas dragging state (for arranging components)
+  const [isDraggingOnCanvas, setIsDraggingOnCanvas] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [draggedCanvasComponent, setDraggedCanvasComponent] = useState(null);
+
   // View controls
   const [zoom, setZoom] = useState(100);
   const [previewMode, setPreviewMode] = useState(false);
@@ -39,6 +44,10 @@ const ProjectEditor = ({ projectId }) => {
     { id: 'page-1', name: 'Home', path: '/' },
   ]);
   const [selectedPage, setSelectedPage] = useState(pages[0]);
+
+  // Workflows state
+  const [workflows, setWorkflows] = useState([]);
+  const [selectedWorkflow, setSelectedWorkflow] = useState(null);
 
   const canvasRef = useRef(null);
 
@@ -73,6 +82,11 @@ const ProjectEditor = ({ projectId }) => {
         setPages(data.project.pages);
         setSelectedPage(data.project.pages[0]);
       }
+
+      // Load workflows if they exist
+      if (data.project.workflows) {
+        setWorkflows(data.project.workflows);
+      }
     } catch (error) {
       console.error('Error fetching project:', error);
       alert('Failed to load project');
@@ -94,7 +108,8 @@ const ProjectEditor = ({ projectId }) => {
         },
         body: JSON.stringify({
           pages: pages,
-          components: { [selectedPage.id]: components }
+          components: { [selectedPage.id]: components },
+          workflows: workflows
         })
       });
 
@@ -102,7 +117,6 @@ const ProjectEditor = ({ projectId }) => {
         throw new Error('Failed to save project');
       }
 
-      // Show success message briefly
       setTimeout(() => setSaving(false), 1000);
     } catch (error) {
       console.error('Error saving project:', error);
@@ -111,7 +125,7 @@ const ProjectEditor = ({ projectId }) => {
     }
   };
 
-  // Drag and Drop Handlers
+  // Drag from Components Panel
   const handleDragStart = (e, component) => {
     setDraggedComponent(component);
     e.dataTransfer.effectAllowed = 'copy';
@@ -127,8 +141,8 @@ const ProjectEditor = ({ projectId }) => {
     if (!draggedComponent) return;
 
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = (e.clientX - rect.left) / (zoom / 100);
+    const y = (e.clientY - rect.top) / (zoom / 100);
 
     const newComponent = {
       id: `${draggedComponent.id}-${Date.now()}`,
@@ -136,7 +150,8 @@ const ProjectEditor = ({ projectId }) => {
       name: draggedComponent.name,
       props: { ...draggedComponent.defaultProps },
       position: { x, y },
-      style: {}
+      style: {},
+      workflows: []
     };
 
     setComponents([...components, newComponent]);
@@ -144,10 +159,68 @@ const ProjectEditor = ({ projectId }) => {
     setSelectedComponent(newComponent);
   };
 
+  // Canvas Component Dragging (Arrange)
+  const handleCanvasComponentMouseDown = (e, component) => {
+    if (previewMode) return;
+    e.stopPropagation();
+    
+    const rect = canvasRef.current.getBoundingClientRect();
+    const offsetX = (e.clientX - rect.left) / (zoom / 100) - component.position.x;
+    const offsetY = (e.clientY - rect.top) / (zoom / 100) - component.position.y;
+
+    setDragOffset({ x: offsetX, y: offsetY });
+    setDraggedCanvasComponent(component);
+    setIsDraggingOnCanvas(true);
+    setSelectedComponent(component);
+  };
+
+  const handleCanvasMouseMove = (e) => {
+    if (!isDraggingOnCanvas || !draggedCanvasComponent) return;
+
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / (zoom / 100) - dragOffset.x;
+    const y = (e.clientY - rect.top) / (zoom / 100) - dragOffset.y;
+
+    // Snap to grid if enabled
+    const snapToGrid = (value) => showGrid ? Math.round(value / 20) * 20 : value;
+
+    const newX = Math.max(0, snapToGrid(x));
+    const newY = Math.max(0, snapToGrid(y));
+
+    setComponents(components.map(comp =>
+      comp.id === draggedCanvasComponent.id
+        ? { ...comp, position: { x: newX, y: newY } }
+        : comp
+    ));
+
+    setSelectedComponent({
+      ...draggedCanvasComponent,
+      position: { x: newX, y: newY }
+    });
+  };
+
+  const handleCanvasMouseUp = () => {
+    setIsDraggingOnCanvas(false);
+    setDraggedCanvasComponent(null);
+  };
+
+  useEffect(() => {
+    if (isDraggingOnCanvas) {
+      document.addEventListener('mousemove', handleCanvasMouseMove);
+      document.addEventListener('mouseup', handleCanvasMouseUp);
+      return () => {
+        document.removeEventListener('mousemove', handleCanvasMouseMove);
+        document.removeEventListener('mouseup', handleCanvasMouseUp);
+      };
+    }
+  }, [isDraggingOnCanvas, draggedCanvasComponent, dragOffset, zoom, showGrid, components]);
+
   // Component Handlers
   const handleComponentClick = (component, e) => {
     e.stopPropagation();
-    setSelectedComponent(component);
+    if (!isDraggingOnCanvas) {
+      setSelectedComponent(component);
+    }
   };
 
   const updateComponentProps = (componentId, newProps) => {
@@ -245,15 +318,66 @@ const ProjectEditor = ({ projectId }) => {
     setSelectedComponent(null);
   };
 
+  // Workflow Handlers
+  const handleWorkflowCreate = (workflow) => {
+    const newWorkflow = {
+      id: `workflow-${Date.now()}`,
+      name: workflow.name,
+      trigger: workflow.trigger,
+      actions: workflow.actions || [],
+      enabled: true,
+      createdAt: new Date().toISOString()
+    };
+    setWorkflows([...workflows, newWorkflow]);
+    setSelectedWorkflow(newWorkflow);
+  };
+
+  const handleWorkflowUpdate = (workflowId, updates) => {
+    setWorkflows(workflows.map(w => 
+      w.id === workflowId ? { ...w, ...updates } : w
+    ));
+    if (selectedWorkflow?.id === workflowId) {
+      setSelectedWorkflow({ ...selectedWorkflow, ...updates });
+    }
+  };
+
+  const handleWorkflowDelete = (workflowId) => {
+    if (!confirm('Delete this workflow?')) return;
+    setWorkflows(workflows.filter(w => w.id !== workflowId));
+    if (selectedWorkflow?.id === workflowId) {
+      setSelectedWorkflow(null);
+    }
+  };
+
+  const handleWorkflowSelect = (workflow) => {
+    setSelectedWorkflow(workflow);
+  };
+
+  const attachWorkflowToComponent = (componentId, workflowId, eventType) => {
+    setComponents(components.map(comp => {
+      if (comp.id === componentId) {
+        const workflows = comp.workflows || [];
+        return {
+          ...comp,
+          workflows: [...workflows, { workflowId, eventType }]
+        };
+      }
+      return comp;
+    }));
+  };
+
   // Component Renderer
   const renderComponent = (component) => {
     const isSelected = selectedComponent?.id === component.id;
     const isHovered = hoveredComponent?.id === component.id;
+    const isBeingDragged = draggedCanvasComponent?.id === component.id;
 
     const componentStyle = {
       left: `${component.position.x}px`,
       top: `${component.position.y}px`,
-      ...component.style
+      ...component.style,
+      cursor: previewMode ? 'default' : 'move',
+      opacity: isBeingDragged ? 0.5 : 1
     };
 
     let content;
@@ -365,7 +489,7 @@ const ProjectEditor = ({ projectId }) => {
         );
     }
 
-    const wrapperClasses = `absolute transition-all ${!previewMode ? 'cursor-move' : ''} ${
+    const wrapperClasses = `absolute transition-all select-none ${
       isSelected && !previewMode ? 'ring-2 ring-indigo-500 ring-offset-2 rounded-xl' : ''
     } ${isHovered && !previewMode && !isSelected ? 'ring-2 ring-indigo-300 ring-offset-2 rounded-xl' : ''}`;
 
@@ -375,11 +499,12 @@ const ProjectEditor = ({ projectId }) => {
         className={wrapperClasses}
         style={componentStyle}
         onClick={(e) => handleComponentClick(component, e)}
+        onMouseDown={(e) => handleCanvasComponentMouseDown(e, component)}
         onMouseEnter={() => !previewMode && setHoveredComponent(component)}
         onMouseLeave={() => setHoveredComponent(null)}
       >
         {!previewMode && isSelected && (
-          <div className="absolute -top-10 left-0 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 shadow-lg">
+          <div className="absolute -top-10 left-0 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 shadow-lg z-10">
             <span>{component.name}</span>
             <div className="flex gap-1 ml-2 border-l border-indigo-400 pl-2">
               <button
@@ -401,6 +526,12 @@ const ProjectEditor = ({ projectId }) => {
                 </svg>
               </button>
             </div>
+          </div>
+        )}
+        {/* Workflow indicator */}
+        {!previewMode && component.workflows && component.workflows.length > 0 && (
+          <div className="absolute -top-2 -right-2 bg-purple-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-lg">
+            {component.workflows.length}
           </div>
         )}
         {content}
@@ -520,7 +651,18 @@ const ProjectEditor = ({ projectId }) => {
             )}
             {leftTab === 'database' && <DatabasePanel />}
             {leftTab === 'api' && <APIPanel />}
-            {leftTab === 'workflows' && <WorkflowsPanel />}
+            {leftTab === 'workflows' && (
+              <WorkflowsPanel
+                workflows={workflows}
+                selectedWorkflow={selectedWorkflow}
+                components={components}
+                onWorkflowCreate={handleWorkflowCreate}
+                onWorkflowUpdate={handleWorkflowUpdate}
+                onWorkflowDelete={handleWorkflowDelete}
+                onWorkflowSelect={handleWorkflowSelect}
+                onAttachToComponent={attachWorkflowToComponent}
+              />
+            )}
           </div>
         </div>
 
@@ -543,26 +685,23 @@ const ProjectEditor = ({ projectId }) => {
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="text-center">
                   <svg className="mx-auto h-16 w-16 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-3zM14 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1h-4a1 1 0 01-1-1v-3z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7h-6V5zM4 12h6v7a1 1 0 01-1 1H5a1 1 0 01-1-1v-7zm10-7h4a1 1 0 011 1v7h-6V5a1 1 0 011-1zm0 7h6v7a1 1 0 01-1 1h-4a1 1 0 01-1-1v-7z" />
                   </svg>
-                  <h3 className="mt-4 text-lg font-semibold text-gray-900">Start Building</h3>
-                  <p className="mt-2 text-sm text-gray-500">Drag components from the left panel onto the canvas</p>
+                  <p className="mt-4 text-gray-400">Drag components here to get started</p> 
                 </div>
               </div>
             )}
-
-            {components.map(renderComponent)}
+            {components.map(component => renderComponent(component))}
           </div>
         </div>
-
-        {/* Right Sidebar (Properties Panel) */}
+        {/* Right Sidebar */}
         <div className="w-80 bg-white border-l border-gray-200">
           <PropertiesPanel
-            selectedComponent={selectedComponent}
+            component={selectedComponent}
             onUpdateProps={updateComponentProps}
-            onMove={moveComponent}
-            onDuplicate={duplicateComponent}
             onDelete={deleteComponent}
+            onDuplicate={duplicateComponent}
+            onMove={moveComponent}
           />
         </div>
       </div>
