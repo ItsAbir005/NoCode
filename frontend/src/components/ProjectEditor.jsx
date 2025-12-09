@@ -48,15 +48,21 @@ const ProjectEditor = ({ projectId }) => {
   const [selectedWorkflow, setSelectedWorkflow] = useState(null);
 
   const canvasRef = useRef(null);
-  useEffect(() => {
-    if (selectedPage) {
-      setComponents(allPageComponents[selectedPage.id] || []);
-      setSelectedComponent(null);
-    }
-  }, [selectedPage, allPageComponents]);
+  const isLoadingPageRef = useRef(false);
 
   useEffect(() => {
     if (selectedPage) {
+      isLoadingPageRef.current = true;
+      setComponents(allPageComponents[selectedPage.id] || []);
+      setSelectedComponent(null);
+      Promise.resolve().then(() => {
+        isLoadingPageRef.current = false;
+      });
+    }
+  }, [selectedPage]);
+
+  useEffect(() => {
+    if (selectedPage && !isLoadingPageRef.current) {
       setAllPageComponents(prev => ({
         ...prev,
         [selectedPage.id]: components
@@ -100,6 +106,8 @@ const ProjectEditor = ({ projectId }) => {
       }
       if (data.project.workflows) {
         setWorkflows(data.project.workflows);
+      } else {
+        setWorkflows([]);
       }
     } catch (error) {
       console.error('Error fetching project:', error);
@@ -395,11 +403,13 @@ const ProjectEditor = ({ projectId }) => {
 
   // Component Renderer
   const renderComponent = (component) => {
+    console.log('workflows type:', typeof workflows, 'value:', workflows);
     const isSelected = selectedComponent?.id === component.id;
     const isHovered = hoveredComponent?.id === component.id;
     const isBeingDragged = draggedCanvasComponent?.id === component.id;
-    const attachedWorkflows = workflows.filter(w => w.trigger.componentId === component.id);
-
+    const attachedWorkflows = Array.isArray(workflows)
+      ? workflows.filter(w => w.trigger?.componentId === component.id)
+      : [];
     const componentStyle = {
       left: `${component.position.x}px`,
       top: `${component.position.y}px`,
