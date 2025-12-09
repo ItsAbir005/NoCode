@@ -25,20 +25,18 @@ const ProjectEditor = ({ projectId }) => {
 
   // Canvas state
   const [components, setComponents] = useState([]);
+  const [allPageComponents, setAllPageComponents] = useState({});
   const [selectedComponent, setSelectedComponent] = useState(null);
   const [draggedComponent, setDraggedComponent] = useState(null);
   const [hoveredComponent, setHoveredComponent] = useState(null);
-
   // Canvas dragging state (for arranging components)
   const [isDraggingOnCanvas, setIsDraggingOnCanvas] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [draggedCanvasComponent, setDraggedCanvasComponent] = useState(null);
-
   // View controls
   const [zoom, setZoom] = useState(100);
   const [previewMode, setPreviewMode] = useState(false);
   const [showGrid, setShowGrid] = useState(true);
-
   // Pages state
   const [pages, setPages] = useState([
     { id: 'page-1', name: 'Home', path: '/' },
@@ -50,6 +48,21 @@ const ProjectEditor = ({ projectId }) => {
   const [selectedWorkflow, setSelectedWorkflow] = useState(null);
 
   const canvasRef = useRef(null);
+  useEffect(() => {
+    if (selectedPage) {
+      setComponents(allPageComponents[selectedPage.id] || []);
+      setSelectedComponent(null);
+    }
+  }, [selectedPage, allPageComponents]);
+
+  useEffect(() => {
+    if (selectedPage) {
+      setAllPageComponents(prev => ({
+        ...prev,
+        [selectedPage.id]: components
+      }));
+    }
+  }, [components, selectedPage]);
 
   // Load project data
   useEffect(() => {
@@ -76,7 +89,7 @@ const ProjectEditor = ({ projectId }) => {
 
       const data = await response.json();
       setProject(data.project);
-      
+
       if (data.project.pages && Array.isArray(data.project.pages) && data.project.pages.length > 0) {
         setPages(data.project.pages);
         const initialPage = data.project.pages[0];
@@ -97,10 +110,16 @@ const ProjectEditor = ({ projectId }) => {
     }
   };
 
+  // Save project data
   const saveProject = async () => {
     setSaving(true);
     try {
       const token = localStorage.getItem('token');
+      const updatedComponents = {
+        ...allPageComponents,
+        [selectedPage.id]: components
+      };
+
       const response = await fetch(`${API_URL}/projects/${projectId}`, {
         method: 'PUT',
         headers: {
@@ -109,19 +128,23 @@ const ProjectEditor = ({ projectId }) => {
         },
         body: JSON.stringify({
           pages: pages,
-          components: { [selectedPage.id]: components },
+          components: updatedComponents, // Send all pages
           workflows: workflows
         })
       });
 
       if (!response.ok) {
-        throw new Error('Failed to save project');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save project');
       }
+
+      // Update local state
+      setAllPageComponents(updatedComponents);
 
       setTimeout(() => setSaving(false), 1000);
     } catch (error) {
       console.error('Error saving project:', error);
-      alert('Failed to save project');
+      alert('Failed to save project: ' + error.message);
       setSaving(false);
     }
   };
@@ -130,6 +153,7 @@ const ProjectEditor = ({ projectId }) => {
   const handleDragStart = (e, component) => {
     setDraggedComponent(component);
     e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setData('text/plain', JSON.stringify(component));
   };
 
   const handleDragOver = (e) => {
@@ -139,20 +163,29 @@ const ProjectEditor = ({ projectId }) => {
 
   const handleDrop = (e) => {
     e.preventDefault();
-    if (!draggedComponent) return;
+    if (!draggedComponent && !e.dataTransfer.getData('text/plain')) return;
+
+    let componentToDrop = draggedComponent;
+    if (!componentToDrop) {
+      try {
+        componentToDrop = JSON.parse(e.dataTransfer.getData('text/plain'));
+      } catch (err) {
+        console.error('Failed to parse dragged component', err);
+        return;
+      }
+    }
 
     const rect = canvasRef.current.getBoundingClientRect();
     const x = (e.clientX - rect.left) / (zoom / 100);
     const y = (e.clientY - rect.top) / (zoom / 100);
 
     const newComponent = {
-      id: `${draggedComponent.id}-${Date.now()}`,
-      type: draggedComponent.id,
-      name: draggedComponent.name,
-      props: { ...draggedComponent.defaultProps },
+      id: `${componentToDrop.id}-${Date.now()}`,
+      type: componentToDrop.id,
+      name: componentToDrop.name,
+      props: { ...componentToDrop.defaultProps },
       position: { x, y },
       style: {},
-
     };
 
     setComponents([...components, newComponent]);
@@ -163,7 +196,7 @@ const ProjectEditor = ({ projectId }) => {
   const handleCanvasComponentMouseDown = (e, component) => {
     if (previewMode) return;
     e.stopPropagation();
-    
+
     const rect = canvasRef.current.getBoundingClientRect();
     const offsetX = (e.clientX - rect.left) / (zoom / 100) - component.position.x;
     const offsetY = (e.clientY - rect.top) / (zoom / 100) - component.position.y;
@@ -181,22 +214,21 @@ const ProjectEditor = ({ projectId }) => {
     const x = (e.clientX - rect.left) / (zoom / 100) - dragOffset.x;
     const y = (e.clientY - rect.top) / (zoom / 100) - dragOffset.y;
 
-    // Snap to grid if enabled
     const snapToGrid = (value) => showGrid ? Math.round(value / 20) * 20 : value;
 
     const newX = Math.max(0, snapToGrid(x));
     const newY = Math.max(0, snapToGrid(y));
 
-    setComponents(components.map(comp =>
+    setComponents(prevComponents => prevComponents.map(comp =>
       comp.id === draggedCanvasComponent.id
         ? { ...comp, position: { x: newX, y: newY } }
         : comp
     ));
 
-    setSelectedComponent({
-      ...draggedCanvasComponent,
+    setSelectedComponent(prev => ({
+      ...prev,
       position: { x: newX, y: newY }
-    });
+    }));
   };
 
   const handleCanvasMouseUp = () => {
@@ -224,22 +256,24 @@ const ProjectEditor = ({ projectId }) => {
   };
 
   const updateComponentProps = (componentId, newProps) => {
-    setComponents(components.map(comp =>
+    setComponents(prevComponents => prevComponents.map(comp =>
       comp.id === componentId
         ? { ...comp, props: { ...comp.props, ...newProps } }
         : comp
     ));
     if (selectedComponent?.id === componentId) {
-      setSelectedComponent({
-        ...selectedComponent,
-        props: { ...selectedComponent.props, ...newProps }
-      });
+      setSelectedComponent(prev => ({
+        ...prev,
+        props: { ...prev.props, ...newProps }
+      }));
     }
   };
 
   const deleteComponent = (componentId) => {
     if (!confirm('Delete this component?')) return;
-    setComponents(components.filter(comp => comp.id !== componentId));
+    setComponents(prevComponents =>
+      prevComponents.filter(comp => comp.id !== componentId)
+    );
     setSelectedComponent(null);
   };
 
@@ -271,7 +305,7 @@ const ProjectEditor = ({ projectId }) => {
       }
       return comp;
     }));
-    
+
     if (selectedComponent?.id === componentId) {
       const comp = components.find(c => c.id === componentId);
       if (comp) {
@@ -306,9 +340,12 @@ const ProjectEditor = ({ projectId }) => {
     }
     const newPages = pages.filter(p => p.id !== pageId);
     setPages(newPages);
+    const newAllPageComponents = { ...allPageComponents };
+    delete newAllPageComponents[pageId];
+    setAllPageComponents(newAllPageComponents);
+
     if (selectedPage?.id === pageId) {
       setSelectedPage(newPages[0]);
-      setComponents([]);
     }
   };
 
@@ -333,17 +370,17 @@ const ProjectEditor = ({ projectId }) => {
   };
 
   const handleWorkflowUpdate = (workflowId, updates) => {
-    setWorkflows(workflows.map(w => 
+    setWorkflows(prevWorkflows => prevWorkflows.map(w =>
       w.id === workflowId ? { ...w, ...updates } : w
     ));
     if (selectedWorkflow?.id === workflowId) {
-      setSelectedWorkflow({ ...selectedWorkflow, ...updates });
+      setSelectedWorkflow(prev => ({ ...prev, ...updates }));
     }
   };
 
   const handleWorkflowDelete = (workflowId) => {
     if (!confirm('Delete this workflow?')) return;
-    setWorkflows(workflows.filter(w => w.id !== workflowId));
+    setWorkflows(prevWorkflows => prevWorkflows.filter(w => w.id !== workflowId));
     if (selectedWorkflow?.id === workflowId) {
       setSelectedWorkflow(null);
     }
@@ -377,11 +414,10 @@ const ProjectEditor = ({ projectId }) => {
     switch (component.type) {
       case 'button':
         content = (
-          <button className={`px-6 py-3 rounded-lg font-semibold transition-all shadow-sm ${
-            p.variant === 'primary' ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-500/20' :
+          <button className={`px-6 py-3 rounded-lg font-semibold transition-all shadow-sm ${p.variant === 'primary' ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-500/20' :
             p.variant === 'secondary' ? 'bg-white text-gray-900 border-2 border-gray-200 hover:border-gray-300' :
-            'bg-transparent border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-50'
-          }`}>
+              'bg-transparent border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-50'
+            }`}>
             {p.text}
           </button>
         );
@@ -480,9 +516,8 @@ const ProjectEditor = ({ projectId }) => {
         );
     }
 
-    const wrapperClasses = `absolute transition-all select-none ${
-      isSelected && !previewMode ? 'ring-2 ring-indigo-500 ring-offset-2 rounded-xl' : ''
-    } ${isHovered && !previewMode && !isSelected ? 'ring-2 ring-indigo-300 ring-offset-2 rounded-xl' : ''}`;
+    const wrapperClasses = `absolute transition-all select-none ${isSelected && !previewMode ? 'ring-2 ring-indigo-500 ring-offset-2 rounded-xl' : ''
+      } ${isHovered && !previewMode && !isSelected ? 'ring-2 ring-indigo-300 ring-offset-2 rounded-xl' : ''}`;
 
     return (
       <div
@@ -525,7 +560,7 @@ const ProjectEditor = ({ projectId }) => {
             {attachedWorkflows.length}
           </div>
         )}
-        
+
         {content}
       </div>
     );
@@ -581,9 +616,8 @@ const ProjectEditor = ({ projectId }) => {
           {/* Grid Toggle */}
           <button
             onClick={() => setShowGrid(!showGrid)}
-            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              showGrid ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
+            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${showGrid ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
           >
             Grid
           </button>
@@ -591,9 +625,8 @@ const ProjectEditor = ({ projectId }) => {
           {/* Preview Toggle */}
           <button
             onClick={() => setPreviewMode(!previewMode)}
-            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              previewMode ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
+            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${previewMode ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
           >
             {previewMode ? 'Edit' : 'Preview'}
           </button>
@@ -629,7 +662,7 @@ const ProjectEditor = ({ projectId }) => {
         {/* Left Sidebar */}
         <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
           <LeftSidebarTabs activeTab={leftTab} onTabChange={setLeftTab} />
-          
+
           <div className="flex-1 overflow-hidden">
             {leftTab === 'components' && <ComponentsPanel onDragStart={handleDragStart} />}
             {leftTab === 'pages' && (
@@ -679,7 +712,7 @@ const ProjectEditor = ({ projectId }) => {
                   <svg className="mx-auto h-16 w-16 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7h-6V5zM4 12h6v7a1 1 0 01-1 1H5a1 1 0 01-1-1v-7zm10-7h4a1 1 0 011 1v7h-6V5a1 1 0 011-1zm0 7h6v7a1 1 0 01-1 1h-4a1 1 0 01-1-1v-7z" />
                   </svg>
-                  <p className="mt-4 text-gray-400">Drag components here to get started</p> 
+                  <p className="mt-4 text-gray-400">Drag components here to get started</p>
                 </div>
               </div>
             )}
