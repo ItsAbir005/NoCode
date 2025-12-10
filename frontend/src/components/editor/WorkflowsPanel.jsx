@@ -1,11 +1,11 @@
 // frontend/src/components/editor/WorkflowsPanel.jsx
 import { useState, useMemo } from 'react';
 
-const WorkflowsPanel = ({ 
-  workflows = [], 
+const WorkflowsPanel = ({
+  workflows = [],
   selectedWorkflow,
   components = [],
-  onWorkflowCreate, 
+  onWorkflowCreate,
   onWorkflowUpdate,
   onWorkflowDelete,
   onWorkflowSelect,
@@ -18,8 +18,8 @@ const WorkflowsPanel = ({
   }, [workflows]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showActionModal, setShowActionModal] = useState(false);
-  const [newWorkflow, setNewWorkflow] = useState({ 
-    name: '', 
+  const [newWorkflow, setNewWorkflow] = useState({
+    name: '',
     trigger: { type: 'click', componentId: '' },
     actions: []
   });
@@ -34,44 +34,47 @@ const WorkflowsPanel = ({
   ];
 
   const actionTypes = [
-    { 
-      id: 'navigate', 
-      name: 'Navigate to Page', 
+    {
+      id: 'navigate',
+      name: 'Navigate to Page',
       icon: '🔗',
       config: { url: '' }
     },
-    { 
-      id: 'show_hide', 
-      name: 'Show/Hide Component', 
+    {
+      id: 'show_hide',
+      name: 'Show/Hide Component',
       icon: '👁️',
       config: { componentId: '', action: 'show' }
     },
-    { 
-      id: 'api_call', 
-      name: 'Call API', 
+    {
+      id: 'api_call',
+      name: 'Call API',
       icon: '🌐',
       config: { endpoint: '', method: 'GET', body: '' }
     },
-    { 
-      id: 'set_value', 
-      name: 'Set Component Value', 
+    {
+      id: 'set_value',
+      name: 'Set Component Value',
       icon: '📝',
       config: { componentId: '', value: '' }
     },
-    { 
-      id: 'show_message', 
-      name: 'Show Message', 
+    {
+      id: 'show_message',
+      name: 'Show Message',
       icon: '💬',
       config: { message: '', type: 'info' }
     },
-    { 
-      id: 'validate', 
-      name: 'Validate Form', 
+    {
+      id: 'validate',
+      name: 'Validate Form',
       icon: '✓',
       config: { componentIds: [] }
     },
   ];
-
+  const getComponentName = (componentId) => {
+    const component = components.find(c => c.id === componentId);
+    return component ? `${component.name} (${component.id.slice(-6)})` : 'Unknown Component';
+  };
   const handleCreateWorkflow = () => {
     if (!newWorkflow.name.trim()) {
       alert('Workflow name is required');
@@ -151,7 +154,7 @@ const WorkflowsPanel = ({
             className="w-full px-3 py-2 text-sm border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500"
           />
         );
-      
+
       case 'show_hide':
         return (
           <div className="space-y-2">
@@ -176,7 +179,7 @@ const WorkflowsPanel = ({
             </select>
           </div>
         );
-      
+
       case 'api_call':
         return (
           <div className="space-y-2">
@@ -208,7 +211,7 @@ const WorkflowsPanel = ({
             )}
           </div>
         );
-      
+
       case 'set_value':
         return (
           <div className="space-y-2">
@@ -231,7 +234,7 @@ const WorkflowsPanel = ({
             />
           </div>
         );
-      
+
       case 'show_message':
         return (
           <div className="space-y-2">
@@ -254,7 +257,7 @@ const WorkflowsPanel = ({
             </select>
           </div>
         );
-      
+
       default:
         return <p className="text-xs text-gray-500">No configuration needed</p>;
     }
@@ -484,7 +487,7 @@ const WorkflowsPanel = ({
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
             <h3 className="text-lg font-bold text-gray-900 mb-4">Create Workflow</h3>
-            
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Workflow Name</label>
@@ -540,17 +543,16 @@ const WorkflowsPanel = ({
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6 max-h-[80vh] overflow-y-auto">
             <h3 className="text-lg font-bold text-gray-900 mb-4">Add Action</h3>
-            
+
             <div className="space-y-3">
               {actionTypes.map(action => (
                 <button
                   key={action.id}
                   onClick={() => setNewAction({ type: action.id, config: {} })}
-                  className={`w-full p-4 text-left border-2 rounded-lg transition-all ${
-                    newAction.type === action.id
+                  className={`w-full p-4 text-left border-2 rounded-lg transition-all ${newAction.type === action.id
                       ? 'border-purple-500 bg-purple-50'
                       : 'border-gray-200 hover:border-purple-300'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center gap-3">
                     <span className="text-2xl">{action.icon}</span>

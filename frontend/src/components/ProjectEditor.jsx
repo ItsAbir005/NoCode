@@ -74,6 +74,18 @@ const ProjectEditor = ({ projectId }) => {
   useEffect(() => {
     fetchProject();
   }, [projectId]);
+  useEffect(() => {
+    if (selectedPage && previewMode) {
+      const pageLoadWorkflows = workflows.filter(
+        w => w.trigger?.type === 'load' && w.enabled !== false
+      );
+      pageLoadWorkflows.forEach(workflow => {
+        setTimeout(() => {
+          executeWorkflow(workflow.id, null, 'load');
+        }, 100);
+      });
+    }
+  }, [selectedPage, previewMode, workflows]);
 
   const fetchProject = async () => {
     try {
@@ -400,23 +412,200 @@ const ProjectEditor = ({ projectId }) => {
 
   const attachWorkflowToComponent = (componentId, workflowId, eventType) => {
   };
+  const executeWorkflow = async (workflowId, componentId, eventType) => {
+    const workflow = workflows.find(w => w.id === workflowId);
+    if (!workflow || !workflow.actions) return;
+
+    console.log(`Executing workflow: ${workflow.name}`);
+
+    for (const action of workflow.actions) {
+      try {
+        await executeAction(action, componentId);
+      } catch (error) {
+        console.error(`Error executing action ${action.name}:`, error);
+        alert(`Workflow error: ${error.message}`);
+        break; // Stop workflow on error
+      }
+    }
+  };
+
+  const executeAction = async (action, triggerComponentId) => {
+    console.log(`Executing action: ${action.name}`, action);
+
+    switch (action.type) {
+      case 'navigate':
+        if (action.config.url) {
+          const page = pages.find(p => p.path === action.config.url);
+          if (page) {
+            setSelectedPage(page);
+            alert(`Navigating to: ${action.config.url}`);
+          } else {
+            alert(`Page not found: ${action.config.url}`);
+          }
+        }
+        break;
+
+      case 'show_hide':
+        if (action.config.componentId) {
+          setComponents(prevComponents => prevComponents.map(comp => {
+            if (comp.id === action.config.componentId) {
+              const currentDisplay = comp.style?.display || 'block';
+              let newDisplay;
+
+              if (action.config.action === 'show') {
+                newDisplay = 'block';
+              } else if (action.config.action === 'hide') {
+                newDisplay = 'none';
+              } else { // toggle
+                newDisplay = currentDisplay === 'none' ? 'block' : 'none';
+              }
+
+              return {
+                ...comp,
+                style: { ...comp.style, display: newDisplay }
+              };
+            }
+            return comp;
+          }));
+        }
+        break;
+
+      case 'api_call':
+        if (action.config.endpoint) {
+          try {
+            const options = {
+              method: action.config.method || 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+              }
+            };
+
+            if (action.config.body && (action.config.method === 'POST' || action.config.method === 'PUT')) {
+              options.body = action.config.body;
+            }
+
+            const response = await fetch(action.config.endpoint, options);
+            const data = await response.json();
+
+            console.log('API Response:', data);
+            alert(`API call successful: ${action.config.method} ${action.config.endpoint}`);
+          } catch (error) {
+            console.error('API call failed:', error);
+            alert(`API call failed: ${error.message}`);
+          }
+        }
+        break;
+
+      case 'set_value':
+        if (action.config.componentId && action.config.value !== undefined) {
+          setComponents(prevComponents => prevComponents.map(comp => {
+            if (comp.id === action.config.componentId) {
+              return {
+                ...comp,
+                props: {
+                  ...comp.props,
+                  value: action.config.value,
+                  content: action.config.value
+                }
+              };
+            }
+            return comp;
+          }));
+        }
+        break;
+
+      case 'show_message':
+        if (action.config.message) {
+          const messageType = action.config.type || 'info';
+          const emoji = {
+            info: 'ℹ️',
+            success: '✅',
+            warning: '⚠️',
+            error: '❌'
+          }[messageType];
+
+          alert(`${emoji} ${action.config.message}`);
+        }
+        break;
+
+      case 'validate':
+        const componentIds = action.config.componentIds || [];
+        let isValid = true;
+        let invalidComponents = [];
+
+        for (const compId of componentIds) {
+          const comp = components.find(c => c.id === compId);
+          if (comp && ['input', 'textarea'].includes(comp.type)) {
+            const value = comp.props.value || '';
+            if (!value.trim()) {
+              isValid = false;
+              invalidComponents.push(comp.name);
+            }
+          }
+        }
+
+        if (!isValid) {
+          throw new Error(`Validation failed: ${invalidComponents.join(', ')} are required`);
+        }
+        break;
+
+      default:
+        console.warn(`Unknown action type: ${action.type}`);
+    }
+    await new Promise(resolve => setTimeout(resolve, 100));
+  };
+
+  const getComponentEventHandlers = (component) => {
+    if (previewMode) {
+      const componentWorkflows = workflows.filter(w =>
+        w.trigger?.componentId === component.id && w.enabled !== false
+      );
+
+      const handlers = {};
+
+      componentWorkflows.forEach(workflow => {
+        const eventName = {
+          'click': 'onClick',
+          'submit': 'onSubmit',
+          'change': 'onChange',
+          'hover': 'onMouseEnter',
+          'load': null
+        }[workflow.trigger.type];
+
+        if (eventName) {
+          handlers[eventName] = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            executeWorkflow(workflow.id, component.id, workflow.trigger.type);
+          };
+        }
+      });
+
+      return handlers;
+    }
+    return {};
+  };
 
   // Component Renderer
   const renderComponent = (component) => {
-    console.log('workflows type:', typeof workflows, 'value:', workflows);
     const isSelected = selectedComponent?.id === component.id;
     const isHovered = hoveredComponent?.id === component.id;
     const isBeingDragged = draggedCanvasComponent?.id === component.id;
     const attachedWorkflows = Array.isArray(workflows)
       ? workflows.filter(w => w.trigger?.componentId === component.id)
       : [];
+
     const componentStyle = {
       left: `${component.position.x}px`,
       top: `${component.position.y}px`,
       ...component.style,
       cursor: previewMode ? 'default' : 'move',
-      opacity: isBeingDragged ? 0.5 : 1
+      opacity: isBeingDragged ? 0.5 : 1,
+      display: component.style?.display || 'block'
     };
+
+    // Get event handlers for workflows
+    const eventHandlers = getComponentEventHandlers(component);
 
     let content;
     const p = component.props;
@@ -424,22 +613,39 @@ const ProjectEditor = ({ projectId }) => {
     switch (component.type) {
       case 'button':
         content = (
-          <button className={`px-6 py-3 rounded-lg font-semibold transition-all shadow-sm ${p.variant === 'primary' ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-500/20' :
-            p.variant === 'secondary' ? 'bg-white text-gray-900 border-2 border-gray-200 hover:border-gray-300' :
-              'bg-transparent border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-50'
-            }`}>
+          <button
+            className={`px-6 py-3 rounded-lg font-semibold transition-all shadow-sm ${p.variant === 'primary' ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-500/20' :
+              p.variant === 'secondary' ? 'bg-white text-gray-900 border-2 border-gray-200 hover:border-gray-300' :
+                'bg-transparent border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-50'
+              }`}
+            {...eventHandlers}
+          >
             {p.text}
           </button>
         );
         break;
 
       case 'text':
-        content = <p className={`text-${p.size || 'base'} text-gray-700 leading-relaxed`}>{p.content}</p>;
+        content = (
+          <p
+            className={`text-${p.size || 'base'} text-gray-700 leading-relaxed`}
+            {...eventHandlers}
+          >
+            {p.content || p.value}
+          </p>
+        );
         break;
 
       case 'heading':
         const HeadingTag = `h${p.level || 1}`;
-        content = <HeadingTag className="text-3xl font-bold text-gray-900 tracking-tight">{p.content}</HeadingTag>;
+        content = (
+          <HeadingTag
+            className="text-3xl font-bold text-gray-900 tracking-tight"
+            {...eventHandlers}
+          >
+            {p.content}
+          </HeadingTag>
+        );
         break;
 
       case 'input':
@@ -449,7 +655,10 @@ const ProjectEditor = ({ projectId }) => {
             <input
               type={p.type || 'text'}
               placeholder={p.placeholder}
+              value={p.value || ''}
               className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none"
+              {...eventHandlers}
+              readOnly={!previewMode}
             />
           </div>
         );
@@ -462,7 +671,10 @@ const ProjectEditor = ({ projectId }) => {
             <textarea
               placeholder={p.placeholder}
               rows={p.rows || 4}
+              value={p.value || ''}
               className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none resize-none"
+              {...eventHandlers}
+              readOnly={!previewMode}
             />
           </div>
         );
@@ -470,7 +682,10 @@ const ProjectEditor = ({ projectId }) => {
 
       case 'card':
         content = (
-          <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6 w-80 hover:shadow-xl transition-shadow">
+          <div
+            className="bg-white rounded-xl shadow-lg border border-gray-100 p-6 w-80 hover:shadow-xl transition-shadow"
+            {...eventHandlers}
+          >
             <h3 className="text-xl font-bold text-gray-900 mb-2">{p.title}</h3>
             <p className="text-gray-600 leading-relaxed">{p.content}</p>
           </div>
@@ -479,9 +694,18 @@ const ProjectEditor = ({ projectId }) => {
 
       case 'image':
         content = p.src ? (
-          <img src={p.src} alt={p.alt} style={{ width: p.width }} className="rounded-xl shadow-md" />
+          <img
+            src={p.src}
+            alt={p.alt}
+            style={{ width: p.width }}
+            className="rounded-xl shadow-md"
+            {...eventHandlers}
+          />
         ) : (
-          <div className="w-64 h-40 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl flex items-center justify-center border-2 border-dashed border-gray-300">
+          <div
+            className="w-64 h-40 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl flex items-center justify-center border-2 border-dashed border-gray-300"
+            {...eventHandlers}
+          >
             <div className="text-center">
               <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -497,6 +721,7 @@ const ProjectEditor = ({ projectId }) => {
           <div
             className="border-2 border-dashed border-gray-300 rounded-xl min-h-[120px] min-w-[300px] bg-gray-50/50"
             style={{ padding: p.padding, backgroundColor: p.backgroundColor }}
+            {...eventHandlers}
           >
             <div className="flex items-center justify-center h-full">
               <span className="text-gray-400 text-sm font-medium">Drop components here</span>
@@ -509,7 +734,11 @@ const ProjectEditor = ({ projectId }) => {
         content = (
           <div className="space-y-2 w-full max-w-md">
             {p.label && <label className="block text-sm font-semibold text-gray-700">{p.label}</label>}
-            <select className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none bg-white">
+            <select
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none bg-white"
+              {...eventHandlers}
+              disabled={!previewMode}
+            >
               <option>Select an option</option>
               {(p.options || []).map((opt, i) => <option key={i}>{opt}</option>)}
             </select>
@@ -519,7 +748,10 @@ const ProjectEditor = ({ projectId }) => {
 
       default:
         content = (
-          <div className="p-6 bg-white rounded-xl border-2 border-gray-200">
+          <div
+            className="p-6 bg-white rounded-xl border-2 border-gray-200"
+            {...eventHandlers}
+          >
             <div className="text-4xl mb-2">{component.name.charAt(0)}</div>
             <p className="text-sm font-semibold text-gray-900">{component.name}</p>
           </div>
@@ -566,7 +798,7 @@ const ProjectEditor = ({ projectId }) => {
         )}
 
         {!previewMode && attachedWorkflows.length > 0 && (
-          <div className="absolute -top-2 -right-2 bg-purple-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-lg">
+          <div className="absolute -top-2 -right-2 bg-purple-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-lg" title={`${attachedWorkflows.length} workflow(s) attached`}>
             {attachedWorkflows.length}
           </div>
         )}
@@ -640,6 +872,14 @@ const ProjectEditor = ({ projectId }) => {
           >
             {previewMode ? 'Edit' : 'Preview'}
           </button>
+          <div className="flex items-center gap-2">
+            {previewMode && (
+              <div className="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-xs font-semibold flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                Preview Mode - Workflows Active
+              </div>
+            )}
+          </div>
 
           {/* Save Button */}
           <button
