@@ -1,5 +1,5 @@
 // frontend/src/components/editor/WorkflowsPanel.jsx
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 
 const WorkflowsPanel = ({ 
   workflows = [], 
@@ -11,7 +11,11 @@ const WorkflowsPanel = ({
   onWorkflowSelect,
   onAttachToComponent
 }) => {
-  const safeWorkflows = Array.isArray(workflows) ? workflows : [];
+  const safeWorkflows = useMemo(() => {
+    if (!workflows) return [];
+    if (Array.isArray(workflows)) return workflows;
+    return [];
+  }, [workflows]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showActionModal, setShowActionModal] = useState(false);
   const [newWorkflow, setNewWorkflow] = useState({ 
@@ -280,7 +284,7 @@ const WorkflowsPanel = ({
         {!selectedWorkflow ? (
           // Workflow List
           <div className="p-4">
-            {(!workflows || workflows.length === 0) ? (
+            {(safeWorkflows.length === 0) ? (
               <div className="text-center py-12">
                 <div className="inline-flex items-center justify-center w-16 h-16 bg-amber-100 rounded-full mb-4">
                   <svg className="w-8 h-8 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -300,7 +304,7 @@ const WorkflowsPanel = ({
               </div>
             ) : (
               <div className="space-y-2">
-                {(workflows || []).map(workflow => (
+                {(safeWorkflows || []).map(workflow => (
                   <div
                     key={workflow.id}
                     onClick={() => onWorkflowSelect(workflow)}
