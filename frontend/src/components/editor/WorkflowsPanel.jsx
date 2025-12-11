@@ -70,6 +70,12 @@ const WorkflowsPanel = ({
       icon: '✓',
       config: { componentIds: [] }
     },
+    {
+      id: 'get_input_value',
+      name: 'Get Input Value',
+      icon: '📥',
+      config: { componentId: '', variableName: '' }
+    }
   ];
   const getComponentName = (componentId) => {
     const component = components.find(c => c.id === componentId);
@@ -357,8 +363,8 @@ const WorkflowsPanel = ({
                             onWorkflowUpdate(workflow.id, { enabled: workflow.enabled === false ? true : false });
                           }}
                           className={`p-1.5 rounded transition-all ${workflow.enabled === false
-                              ? 'hover:bg-green-100 text-gray-400'
-                              : 'hover:bg-gray-100 text-green-600'
+                            ? 'hover:bg-green-100 text-gray-400'
+                            : 'hover:bg-gray-100 text-green-600'
                             }`}
                           title={workflow.enabled === false ? 'Enable' : 'Disable'}
                         >

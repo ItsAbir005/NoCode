@@ -136,6 +136,15 @@ const ProjectEditor = ({ projectId }) => {
   // Save project data
   const saveProject = async () => {
     setSaving(true);
+    useEffect(() => {
+      if (!loading && project) {
+        const autoSaveTimer = setTimeout(() => {
+          saveProject();
+        }, 2000);
+
+        return () => clearTimeout(autoSaveTimer);
+      }
+    }, [components, pages, workflows, selectedPage]);
     try {
       const token = localStorage.getItem('token');
       const updatedComponents = {
