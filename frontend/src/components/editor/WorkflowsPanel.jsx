@@ -315,27 +315,78 @@ const WorkflowsPanel = ({
                   >
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1">
-                        <h4 className="text-sm font-bold text-gray-900 mb-1">{workflow.name}</h4>
-                        <div className="flex items-center gap-2 text-xs text-gray-500">
-                          <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded font-medium">
-                            {triggerTypes.find(t => t.id === workflow.trigger.type)?.name}
-                          </span>
-                          <span>→</span>
-                          <span>{workflow.actions?.length || 0} actions</span>
+                        {/* Workflow name and status */}
+                        <div className="flex items-center gap-2 mb-2">
+                          <h4 className="text-sm font-bold text-gray-900">{workflow.name}</h4>
+                          {workflow.enabled === false && (
+                            <span className="px-2 py-0.5 bg-gray-200 text-gray-600 rounded text-xs font-medium">
+                              Disabled
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Trigger info with component */}
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 text-xs text-gray-500 flex-wrap">
+                            <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded font-medium">
+                              {triggerTypes.find(t => t.id === workflow.trigger.type)?.name}
+                            </span>
+                            {workflow.trigger.componentId && (
+                              <>
+                                <span>on</span>
+                                <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded font-medium">
+                                  {getComponentName(workflow.trigger.componentId)}
+                                </span>
+                              </>
+                            )}
+                          </div>
+
+                          {/* Action count */}
+                          <div className="text-xs text-gray-500">
+                            {workflow.actions?.length || 0} action{workflow.actions?.length !== 1 ? 's' : ''}
+                          </div>
                         </div>
                       </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onWorkflowDelete(workflow.id);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 rounded transition-all"
-                        title="Delete"
-                      >
-                        <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
+
+                      {/* Action buttons */}
+                      <div className="flex items-center gap-1">
+                        {/* Enable/Disable toggle */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onWorkflowUpdate(workflow.id, { enabled: workflow.enabled === false ? true : false });
+                          }}
+                          className={`p-1.5 rounded transition-all ${workflow.enabled === false
+                              ? 'hover:bg-green-100 text-gray-400'
+                              : 'hover:bg-gray-100 text-green-600'
+                            }`}
+                          title={workflow.enabled === false ? 'Enable' : 'Disable'}
+                        >
+                          {workflow.enabled === false ? (
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                            </svg>
+                          ) : (
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          )}
+                        </button>
+
+                        {/* Delete button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onWorkflowDelete(workflow.id);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 rounded transition-all"
+                          title="Delete"
+                        >
+                          <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -550,8 +601,8 @@ const WorkflowsPanel = ({
                   key={action.id}
                   onClick={() => setNewAction({ type: action.id, config: {} })}
                   className={`w-full p-4 text-left border-2 rounded-lg transition-all ${newAction.type === action.id
-                      ? 'border-purple-500 bg-purple-50'
-                      : 'border-gray-200 hover:border-purple-300'
+                    ? 'border-purple-500 bg-purple-50'
+                    : 'border-gray-200 hover:border-purple-300'
                     }`}
                 >
                   <div className="flex items-center gap-3">

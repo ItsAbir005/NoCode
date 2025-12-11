@@ -385,7 +385,10 @@ const ProjectEditor = ({ projectId }) => {
       enabled: true,
       createdAt: new Date().toISOString()
     };
-    setWorkflows([...workflows, newWorkflow]);
+    setWorkflows(prevWorkflows => {
+      const workflowsArray = Array.isArray(prevWorkflows) ? prevWorkflows : [];
+      return [...workflowsArray, newWorkflow];
+    });
     setSelectedWorkflow(newWorkflow);
   };
 
@@ -872,14 +875,12 @@ const ProjectEditor = ({ projectId }) => {
           >
             {previewMode ? 'Edit' : 'Preview'}
           </button>
-          <div className="flex items-center gap-2">
-            {previewMode && (
-              <div className="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-xs font-semibold flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                Preview Mode - Workflows Active
-              </div>
-            )}
-          </div>
+          {previewMode && (
+            <div className="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-xs font-semibold flex items-center gap-2">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              Preview Mode - Workflows Active
+            </div>
+          )}
 
           {/* Save Button */}
           <button
@@ -906,7 +907,6 @@ const ProjectEditor = ({ projectId }) => {
           </button>
         </div>
       </nav>
-
       {/* Main Editor Area */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar */}
