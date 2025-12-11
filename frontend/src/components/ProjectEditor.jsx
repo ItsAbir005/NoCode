@@ -112,8 +112,11 @@ const ProjectEditor = ({ projectId }) => {
         setPages(data.project.pages);
         const initialPage = data.project.pages[0];
         setSelectedPage(initialPage);
-        if (data.project.components && data.project.components[initialPage.id]) {
-          setComponents(data.project.components[initialPage.id]);
+        if (data.project.components) {
+          setAllPageComponents(data.project.components);
+          if (data.project.components[initialPage.id]) {
+            setComponents(data.project.components[initialPage.id]);
+          }
         }
       }
       if (data.project.workflows) {

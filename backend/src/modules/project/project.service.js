@@ -45,9 +45,23 @@ exports.getAllProjects = async (userId) => {
 
 exports.getProjectById = async (projectId, userId) => {
   const project = await prisma.project.findFirst({
-    where: { 
+    where: {
       id: projectId,
-      userId 
+      userId
+    },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      thumbnail: true,
+      status: true,
+      pages: true,
+      components: true,
+      workflows: true,
+      database: true,
+      settings: true,
+      createdAt: true,
+      updatedAt: true
     }
   });
 
@@ -83,7 +97,7 @@ exports.createProject = async (userId, data) => {
 
 exports.updateProject = async (projectId, userId, data) => {
   const existing = await this.getProjectById(projectId, userId);
-  const { name, description, thumbnail, status } = data;
+  const { name, description, thumbnail, status, pages, components, workflows } = data;
   
   const updateData = {};
   if (name !== undefined) updateData.name = name.trim();
@@ -95,6 +109,9 @@ exports.updateProject = async (projectId, userId, data) => {
     }
     updateData.status = status;
   }
+  if (pages !== undefined) updateData.pages = pages;
+  if (components !== undefined) updateData.components = components;
+  if (workflows !== undefined) updateData.workflows = workflows;
 
   const project = await prisma.project.update({
     where: { id: projectId },
@@ -106,7 +123,7 @@ exports.updateProject = async (projectId, userId, data) => {
 
 exports.deleteProject = async (projectId, userId) => {
   await this.getProjectById(projectId, userId);
-  
+
   await prisma.project.delete({
     where: { id: projectId }
   });
@@ -142,21 +159,21 @@ exports.getProjectStats = async (userId) => {
   });
 
   const active = await prisma.project.count({
-    where: { 
+    where: {
       userId,
       status: 'active'
     }
   });
 
   const draft = await prisma.project.count({
-    where: { 
+    where: {
       userId,
       status: 'draft'
     }
   });
 
   const archived = await prisma.project.count({
-    where: { 
+    where: {
       userId,
       status: 'archived'
     }
