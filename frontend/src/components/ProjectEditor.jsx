@@ -429,17 +429,49 @@ const ProjectEditor = ({ projectId }) => {
   };
   const executeWorkflow = async (workflowId, componentId, eventType) => {
     const workflow = workflows.find(w => w.id === workflowId);
-    if (!workflow || !workflow.actions) return;
+    if (!workflow) return;
 
     console.log(`Executing workflow: ${workflow.name}`);
+    if (workflow.nodes && workflow.connections) {
+      await executeNodeWorkflow(workflow, componentId);
+    }
+    else if (workflow.actions) {
+      for (const action of workflow.actions) {
+        try {
+          await executeAction(action, componentId);
+        } catch (error) {
+          console.error(`Error executing action ${action.name}:`, error);
+          alert(`Workflow error: ${error.message}`);
+          break;
+        }
+      }
+    }
+  };
+  const executeNodeWorkflow = async (workflow, componentId) => {
+    const { nodes, connections } = workflow;
+    const triggerNode = nodes.find(n => n.type === 'trigger');
+    if (!triggerNode) return;
+    const executionOrder = [];
+    let currentNodeId = triggerNode.id;
+    const visited = new Set();
 
-    for (const action of workflow.actions) {
+    while (currentNodeId && !visited.has(currentNodeId)) {
+      visited.add(currentNodeId);
+      const node = nodes.find(n => n.id === currentNodeId);
+
+      if (node && node.type === 'action') {
+        executionOrder.push(node);
+      }
+      const nextConnection = connections.find(c => c.from === currentNodeId);
+      currentNodeId = nextConnection?.to;
+    }
+    for (const node of executionOrder) {
       try {
-        await executeAction(action, componentId);
+        await executeAction(node.data, componentId);
       } catch (error) {
-        console.error(`Error executing action ${action.name}:`, error);
+        console.error(`Error executing node ${node.id}:`, error);
         alert(`Workflow error: ${error.message}`);
-        break; // Stop workflow on error
+        break;
       }
     }
   };

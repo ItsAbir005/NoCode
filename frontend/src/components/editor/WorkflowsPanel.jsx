@@ -401,139 +401,40 @@ const WorkflowsPanel = ({
           </div>
         ) : (
           // Workflow Editor
-          <div className="p-4 space-y-6">
+          <div className="flex flex-col h-full">
             {/* Back Button */}
-            <button
-              onClick={() => onWorkflowSelect(null)}
-              className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              Back to Workflows
-            </button>
-
-            {/* Workflow Name */}
-            <div>
-              <h3 className="text-lg font-bold text-gray-900 mb-1">{selectedWorkflow.name}</h3>
-              <p className="text-xs text-gray-500">Configure your workflow actions</p>
-            </div>
-
-            {/* Trigger */}
-            <div className="bg-purple-50 border-2 border-purple-200 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center text-white font-bold">
-                  ⚡
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-gray-900">Trigger</h4>
-                  <p className="text-xs text-gray-600">When this happens...</p>
-                </div>
-              </div>
-              <select
-                value={selectedWorkflow.trigger.type}
-                onChange={(e) => onWorkflowUpdate(selectedWorkflow.id, {
-                  trigger: { ...selectedWorkflow.trigger, type: e.target.value }
-                })}
-                className="w-full px-3 py-2 text-sm border-2 border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 bg-white"
+            <div className="p-4 border-b border-gray-200">
+              <button
+                onClick={() => onWorkflowSelect(null)}
+                className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors mb-3"
               >
-                {triggerTypes.map(t => (
-                  <option key={t.id} value={t.id}>{t.icon} {t.name}</option>
-                ))}
-              </select>
-              {selectedWorkflow.trigger.type !== 'load' && (
-                <select
-                  value={selectedWorkflow.trigger.componentId || ''}
-                  onChange={(e) => onWorkflowUpdate(selectedWorkflow.id, {
-                    trigger: { ...selectedWorkflow.trigger, componentId: e.target.value }
-                  })}
-                  className="w-full mt-2 px-3 py-2 text-sm border-2 border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 bg-white"
-                >
-                  <option value="">Select Component</option>
-                  {components.map(c => (
-                    <option key={c.id} value={c.id}>{c.name} ({c.id.slice(-6)})</option>
-                  ))}
-                </select>
-              )}
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Back to Workflows
+              </button>
+              <h3 className="text-lg font-bold text-gray-900">{selectedWorkflow.name}</h3>
             </div>
 
-            {/* Actions */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <h4 className="text-sm font-bold text-gray-900">Actions</h4>
-                  <p className="text-xs text-gray-500">Execute these steps</p>
-                </div>
-                <button
-                  onClick={() => setShowActionModal(true)}
-                  className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-semibold hover:bg-purple-700 transition-colors"
-                >
-                  + Add Action
-                </button>
-              </div>
+            {/* Node Canvas */}
+            <div className="flex-1 relative bg-gray-50 overflow-hidden">
+              <NodeCanvas
+                workflow={selectedWorkflow}
+                components={components}
+                onUpdateWorkflow={(updates) => onWorkflowUpdate(selectedWorkflow.id, updates)}
+                triggerTypes={triggerTypes}
+                actionTypes={actionTypes}
+              />
+            </div>
 
-              <div className="space-y-3">
-                {selectedWorkflow.actions?.length === 0 ? (
-                  <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
-                    <p className="text-sm text-gray-500">No actions yet</p>
-                    <button
-                      onClick={() => setShowActionModal(true)}
-                      className="mt-2 text-sm text-purple-600 font-medium hover:text-purple-700"
-                    >
-                      Add your first action
-                    </button>
-                  </div>
-                ) : (
-                  selectedWorkflow.actions.map((action, index) => (
-                    <div key={action.id} className="bg-white border-2 border-gray-200 rounded-lg p-4">
-                      <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center text-sm font-bold text-gray-600 flex-shrink-0">
-                          {index + 1}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between mb-2">
-                            <h5 className="text-sm font-bold text-gray-900">{action.name}</h5>
-                            <div className="flex items-center gap-1">
-                              {index > 0 && (
-                                <button
-                                  onClick={() => handleMoveAction(action.id, 'up')}
-                                  className="p-1 hover:bg-gray-100 rounded"
-                                  title="Move Up"
-                                >
-                                  <svg className="w-4 h-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                                  </svg>
-                                </button>
-                              )}
-                              {index < selectedWorkflow.actions.length - 1 && (
-                                <button
-                                  onClick={() => handleMoveAction(action.id, 'down')}
-                                  className="p-1 hover:bg-gray-100 rounded"
-                                  title="Move Down"
-                                >
-                                  <svg className="w-4 h-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                  </svg>
-                                </button>
-                              )}
-                              <button
-                                onClick={() => handleDeleteAction(action.id)}
-                                className="p-1 hover:bg-red-100 rounded"
-                                title="Delete"
-                              >
-                                <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                              </button>
-                            </div>
-                          </div>
-                          {renderActionConfig(action)}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
+            {/* Add Node Button */}
+            <div className="p-4 border-t border-gray-200">
+              <button
+                onClick={() => setShowActionModal(true)}
+                className="w-full px-4 py-3 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors"
+              >
+                + Add Action Node
+              </button>
             </div>
           </div>
         )}
@@ -594,28 +495,40 @@ const WorkflowsPanel = ({
           </div>
         </div>
       )}
-
       {/* Add Action Modal */}
       {showActionModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6 max-h-[80vh] overflow-y-auto">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Add Action</h3>
+            <h3 className="text-lg font-bold text-gray-900 mb-4">Add Action Node</h3>
 
             <div className="space-y-3">
               {actionTypes.map(action => (
                 <button
                   key={action.id}
-                  onClick={() => setNewAction({ type: action.id, config: {} })}
-                  className={`w-full p-4 text-left border-2 rounded-lg transition-all ${newAction.type === action.id
-                    ? 'border-purple-500 bg-purple-50'
-                    : 'border-gray-200 hover:border-purple-300'
-                    }`}
+                  onClick={() => {
+                    // Create new node
+                    const newNode = {
+                      id: `node-${Date.now()}`,
+                      type: 'action',
+                      position: {
+                        x: 200 + (selectedWorkflow.nodes?.length || 0) * 200,
+                        y: 150
+                      },
+                      data: { type: action.id, name: action.name, config: action.config }
+                    };
+
+                    onWorkflowUpdate(selectedWorkflow.id, {
+                      nodes: [...(selectedWorkflow.nodes || []), newNode],
+                      connections: selectedWorkflow.connections || []
+                    });
+
+                    setShowActionModal(false);
+                  }}
+                  className="w-full p-4 text-left border-2 rounded-lg border-gray-200 hover:border-purple-300 transition-all"
                 >
                   <div className="flex items-center gap-3">
                     <span className="text-2xl">{action.icon}</span>
-                    <div>
-                      <div className="font-semibold text-gray-900 text-sm">{action.name}</div>
-                    </div>
+                    <div className="font-semibold text-gray-900 text-sm">{action.name}</div>
                   </div>
                 </button>
               ))}
@@ -623,25 +536,16 @@ const WorkflowsPanel = ({
 
             <div className="flex gap-3 mt-6">
               <button
-                onClick={() => {
-                  setShowActionModal(false);
-                  setNewAction({ type: '', config: {} });
-                }}
+                onClick={() => setShowActionModal(false)}
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
               >
                 Cancel
-              </button>
-              <button
-                onClick={handleAddAction}
-                disabled={!newAction.type}
-                className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
-              >
-                Add Action
               </button>
             </div>
           </div>
         </div>
       )}
+
     </div>
   );
 };
