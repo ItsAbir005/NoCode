@@ -1,5 +1,244 @@
 // frontend/src/components/editor/WorkflowsPanel.jsx
 import { useState, useMemo } from 'react';
+const NodeCanvas = ({ workflow, components, onUpdateWorkflow, triggerTypes, actionTypes }) => {
+  const [nodes, setNodes] = useState(workflow.nodes || []);
+  const [connections, setConnections] = useState(workflow.connections || []);
+  const [selectedNode, setSelectedNode] = useState(null);
+  const [draggedNode, setDraggedNode] = useState(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [connectingFrom, setConnectingFrom] = useState(null);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    if (nodes.length === 0 && workflow.trigger) {
+      const triggerNode = {
+        id: 'trigger',
+        type: 'trigger',
+        position: { x: 50, y: 150 },
+        data: workflow.trigger
+      };
+      setNodes([triggerNode]);
+    }
+  }, []);
+  useEffect(() => {
+    onUpdateWorkflow({ nodes, connections });
+  }, [nodes, connections]);
+
+  const handleNodeMouseDown = (e, node) => {
+    e.stopPropagation();
+    const rect = canvasRef.current.getBoundingClientRect();
+    setDragOffset({
+      x: e.clientX - rect.left - node.position.x,
+      y: e.clientY - rect.top - node.position.y
+    });
+    setDraggedNode(node);
+    setSelectedNode(node);
+  };
+
+  const handleMouseMove = (e) => {
+    if (draggedNode) {
+      const rect = canvasRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left - dragOffset.x;
+      const y = e.clientY - rect.top - dragOffset.y;
+
+      setNodes(nodes.map(n =>
+        n.id === draggedNode.id
+          ? { ...n, position: { x: Math.max(0, x), y: Math.max(0, y) } }
+          : n
+      ));
+    }
+
+    if (connectingFrom) {
+      const rect = canvasRef.current.getBoundingClientRect();
+      setMousePos({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      });
+    }
+  };
+
+  const handleMouseUp = () => {
+    setDraggedNode(null);
+    setConnectingFrom(null);
+  };
+
+  const startConnection = (nodeId) => {
+    setConnectingFrom(nodeId);
+  };
+
+  const completeConnection = (toNodeId) => {
+    if (connectingFrom && connectingFrom !== toNodeId) {
+      const newConnection = {
+        id: `conn-${Date.now()}`,
+        from: connectingFrom,
+        to: toNodeId
+      };
+      setConnections([...connections, newConnection]);
+    }
+    setConnectingFrom(null);
+  };
+
+  const deleteNode = (nodeId) => {
+    if (nodeId === 'trigger') return; // Can't delete trigger
+    setNodes(nodes.filter(n => n.id !== nodeId));
+    setConnections(connections.filter(c => c.from !== nodeId && c.to !== nodeId));
+    setSelectedNode(null);
+  };
+
+  const deleteConnection = (connId) => {
+    setConnections(connections.filter(c => c.id !== connId));
+  };
+
+  const getNodeCenter = (node) => {
+    return {
+      x: node.position.x + 80,
+      y: node.position.y + 40
+    };
+  };
+
+  const renderConnection = (conn) => {
+    const fromNode = nodes.find(n => n.id === conn.from);
+    const toNode = nodes.find(n => n.id === conn.to);
+    if (!fromNode || !toNode) return null;
+
+    const from = getNodeCenter(fromNode);
+    const to = getNodeCenter(toNode);
+
+    const midX = (from.x + to.x) / 2;
+    const path = `M ${from.x} ${from.y} C ${midX} ${from.y}, ${midX} ${to.y}, ${to.x} ${to.y}`;
+
+    return (
+      <g key={conn.id}>
+        <path
+          d={path}
+          stroke="#9333ea"
+          strokeWidth="3"
+          fill="none"
+          strokeLinecap="round"
+        />
+        <circle cx={to.x} cy={to.y} r="4" fill="#9333ea" />
+        <circle
+          cx={(from.x + to.x) / 2}
+          cy={(from.y + to.y) / 2}
+          r="8"
+          fill="#ef4444"
+          className="cursor-pointer hover:r-10"
+          onClick={() => deleteConnection(conn.id)}
+        />
+      </g>
+    );
+  };
+
+  const renderNode = (node) => {
+    const isSelected = selectedNode?.id === node.id;
+
+    return (
+      <div
+        key={node.id}
+        className={`absolute bg-white rounded-lg shadow-lg border-2 p-4 cursor-move select-none ${isSelected ? 'border-purple-500 ring-2 ring-purple-200' : 'border-gray-300'
+          }`}
+        style={{
+          left: `${node.position.x}px`,
+          top: `${node.position.y}px`,
+          width: '160px'
+        }}
+        onMouseDown={(e) => handleNodeMouseDown(e, node)}
+        onClick={() => setSelectedNode(node)}
+      >
+        {/* Node Header */}
+        <div className="flex items-center justify-between mb-2">
+          <div className={`text-xs font-bold px-2 py-1 rounded ${node.type === 'trigger' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+            }`}>
+            {node.type === 'trigger' ? '⚡ Trigger' : '🔧 Action'}
+          </div>
+          {node.type !== 'trigger' && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                deleteNode(node.id);
+              }}
+              className="p-1 hover:bg-red-100 rounded"
+            >
+              <svg className="w-3 h-3 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+
+        {/* Node Content */}
+        <div className="text-xs font-semibold text-gray-900 mb-3 truncate">
+          {node.type === 'trigger'
+            ? triggerTypes.find(t => t.id === node.data.type)?.name
+            : actionTypes.find(a => a.id === node.data.type)?.name}
+        </div>
+
+        {/* Connection Points */}
+        <div className="flex justify-between">
+          <button
+            className="w-6 h-6 bg-purple-500 rounded-full border-2 border-white shadow-md hover:scale-110 transition-transform"
+            onClick={(e) => {
+              e.stopPropagation();
+              startConnection(node.id);
+            }}
+            title="Connect from here"
+          >
+            <span className="text-white text-xs">→</span>
+          </button>
+          <button
+            className="w-6 h-6 bg-green-500 rounded-full border-2 border-white shadow-md hover:scale-110 transition-transform"
+            onClick={(e) => {
+              e.stopPropagation();
+              completeConnection(node.id);
+            }}
+            title="Connect to here"
+          >
+            <span className="text-white text-xs">←</span>
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div
+      ref={canvasRef}
+      className="w-full h-full relative"
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+    >
+      {/* SVG for connections */}
+      <svg className="absolute inset-0 w-full h-full pointer-events-none">
+        {connections.map(renderConnection)}
+
+        {/* Temporary connection line while dragging */}
+        {connectingFrom && (
+          <line
+            x1={getNodeCenter(nodes.find(n => n.id === connectingFrom)).x}
+            y1={getNodeCenter(nodes.find(n => n.id === connectingFrom)).y}
+            x2={mousePos.x}
+            y2={mousePos.y}
+            stroke="#9333ea"
+            strokeWidth="2"
+            strokeDasharray="5,5"
+          />
+        )}
+      </svg>
+
+      {/* Nodes */}
+      {nodes.map(renderNode)}
+
+      {/* Instructions */}
+      {nodes.length === 1 && connections.length === 0 && (
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
+          <p className="text-sm text-gray-500 mb-2">👇 Drag the trigger node to reposition</p>
+          <p className="text-sm text-gray-500">Click "Add Action Node" below to continue</p>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const WorkflowsPanel = ({
   workflows = [],
