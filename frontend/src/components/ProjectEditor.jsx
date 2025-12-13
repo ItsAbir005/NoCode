@@ -132,19 +132,19 @@ const ProjectEditor = ({ projectId }) => {
       setLoading(false);
     }
   };
+  useEffect(() => {
+  if (!loading && project) {
+    const autoSaveTimer = setTimeout(() => {
+      saveProject();
+    }, 2000);
+
+    return () => clearTimeout(autoSaveTimer);
+  }
+}, [components.length, pages.length, workflows.length, selectedPage?.id]);
 
   // Save project data
   const saveProject = async () => {
     setSaving(true);
-    useEffect(() => {
-      if (!loading && project) {
-        const autoSaveTimer = setTimeout(() => {
-          saveProject();
-        }, 2000);
-
-        return () => clearTimeout(autoSaveTimer);
-      }
-    }, [components, pages, workflows, selectedPage]);
     try {
       const token = localStorage.getItem('token');
       const updatedComponents = {

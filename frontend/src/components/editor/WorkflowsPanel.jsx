@@ -1,5 +1,5 @@
 // frontend/src/components/editor/WorkflowsPanel.jsx
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 const NodeCanvas = ({ workflow, components, onUpdateWorkflow, triggerTypes, actionTypes }) => {
   const [nodes, setNodes] = useState(workflow.nodes || []);
   const [connections, setConnections] = useState(workflow.connections || []);
@@ -19,7 +19,7 @@ const NodeCanvas = ({ workflow, components, onUpdateWorkflow, triggerTypes, acti
       };
       setNodes([triggerNode]);
     }
-  }, []);
+  }, [workflow.trigger]);
   useEffect(() => {
     onUpdateWorkflow({ nodes, connections });
   }, [nodes, connections]);
