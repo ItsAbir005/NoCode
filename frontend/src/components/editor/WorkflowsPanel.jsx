@@ -1,5 +1,5 @@
 // frontend/src/components/editor/WorkflowsPanel.jsx
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 const NodeCanvas = ({ workflow, components, onUpdateWorkflow, triggerTypes, actionTypes }) => {
   const [nodes, setNodes] = useState(workflow.nodes || []);
   const [connections, setConnections] = useState(workflow.connections || []);
@@ -14,7 +14,7 @@ const NodeCanvas = ({ workflow, components, onUpdateWorkflow, triggerTypes, acti
       const triggerNode = {
         id: 'trigger',
         type: 'trigger',
-        position: { x: 50, y: 150 },
+        position: { x: 50, y: 50 },
         data: workflow.trigger
       };
       setNodes([triggerNode]);
@@ -140,7 +140,8 @@ const NodeCanvas = ({ workflow, components, onUpdateWorkflow, triggerTypes, acti
         style={{
           left: `${node.position.x}px`,
           top: `${node.position.y}px`,
-          width: '160px'
+          width: '160px',
+          zIndex: 10
         }}
         onMouseDown={(e) => handleNodeMouseDown(e, node)}
         onClick={() => setSelectedNode(node)}
@@ -204,15 +205,13 @@ const NodeCanvas = ({ workflow, components, onUpdateWorkflow, triggerTypes, acti
     <div
       ref={canvasRef}
       className="w-full h-full relative"
+      style={{ minHeight: '500px', background: 'linear-gradient(90deg, #f0f0f0 1px, transparent 1px), linear-gradient(#f0f0f0 1px, transparent 1px)', backgroundSize: '20px 20px' }}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
-      {/* SVG for connections */}
       <svg className="absolute inset-0 w-full h-full pointer-events-none">
         {connections.map(renderConnection)}
-
-        {/* Temporary connection line while dragging */}
         {connectingFrom && (
           <line
             x1={getNodeCenter(nodes.find(n => n.id === connectingFrom)).x}
@@ -656,7 +655,7 @@ const WorkflowsPanel = ({
             </div>
 
             {/* Node Canvas */}
-            <div className="flex-1 relative bg-gray-50 overflow-hidden">
+            <div className="flex-1 relative bg-gray-50 overflow-hidden" style={{ minHeight: '500px' }}>
               <NodeCanvas
                 workflow={selectedWorkflow}
                 components={components}
