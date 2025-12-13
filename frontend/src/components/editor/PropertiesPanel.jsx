@@ -1,11 +1,11 @@
 // frontend/src/components/editor/PropertiesPanel.jsx
 
-const PropertiesPanel = ({ 
-  selectedComponent, 
-  onUpdateProps, 
-  onMove, 
-  onDuplicate, 
-  onDelete 
+const PropertiesPanel = ({
+  selectedComponent,
+  onUpdateProps,
+  onMove,
+  onDuplicate,
+  onDelete
 }) => {
   if (!selectedComponent) {
     return (
@@ -13,7 +13,7 @@ const PropertiesPanel = ({
         <div className="p-4 border-b border-gray-200 bg-gray-50">
           <h3 className="text-sm font-bold text-gray-900">Properties</h3>
         </div>
-        
+
         <div className="flex-1 flex items-center justify-center px-4">
           <div className="text-center">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-3">
@@ -65,7 +65,7 @@ const PropertiesPanel = ({
             <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
               <div className="grid grid-cols-3 gap-2">
                 <div></div>
-                <button 
+                <button
                   onClick={() => onMove(selectedComponent.id, 'up')}
                   className="p-2 bg-white border-2 border-gray-300 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition-all active:scale-95"
                   title="Move Up"
@@ -75,8 +75,8 @@ const PropertiesPanel = ({
                   </svg>
                 </button>
                 <div></div>
-                
-                <button 
+
+                <button
                   onClick={() => onMove(selectedComponent.id, 'left')}
                   className="p-2 bg-white border-2 border-gray-300 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition-all active:scale-95"
                   title="Move Left"
@@ -85,12 +85,12 @@ const PropertiesPanel = ({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
                   </svg>
                 </button>
-                
+
                 <div className="flex items-center justify-center">
                   <div className="text-xs font-semibold text-gray-500">Move</div>
                 </div>
-                
-                <button 
+
+                <button
                   onClick={() => onMove(selectedComponent.id, 'right')}
                   className="p-2 bg-white border-2 border-gray-300 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition-all active:scale-95"
                   title="Move Right"
@@ -99,9 +99,9 @@ const PropertiesPanel = ({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                   </svg>
                 </button>
-                
+
                 <div></div>
-                <button 
+                <button
                   onClick={() => onMove(selectedComponent.id, 'down')}
                   className="p-2 bg-white border-2 border-gray-300 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition-all active:scale-95"
                   title="Move Down"
@@ -111,7 +111,7 @@ const PropertiesPanel = ({
                   </svg>
                 </button>
               </div>
-              
+
               <div className="mt-3 pt-3 border-t border-gray-200 grid grid-cols-2 gap-2 text-xs">
                 <div>
                   <span className="text-gray-500">X:</span>
@@ -145,6 +145,29 @@ const PropertiesPanel = ({
               ))}
             </div>
           )}
+          {/* Workflows Section */}
+          <div className="space-y-3 pt-6 border-t border-gray-200">
+            <h5 className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+              Workflows
+            </h5>
+
+            <button
+              onClick={() => {
+                const newWorkflow = {
+                  name: `${selectedComponent.name} Action`,
+                  trigger: {
+                    type: 'click',
+                    componentId: selectedComponent.id
+                  },
+                  actions: []
+                };
+                onWorkflowCreate?.(newWorkflow);
+              }}
+              className="w-full px-4 py-2 bg-purple-50 border-2 border-purple-200 text-purple-700 rounded-lg hover:bg-purple-100 text-sm font-semibold"
+            >
+              + Add Workflow
+            </button>
+          </div>
 
           {/* Actions */}
           <div className="pt-6 border-t border-gray-200 space-y-2">

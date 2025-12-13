@@ -1021,6 +1021,7 @@ const ProjectEditor = ({ projectId }) => {
             onDelete={deleteComponent}
             onDuplicate={duplicateComponent}
             onMove={moveComponent}
+            onWorkflowCreate={handleWorkflowCreate}
           />
         </div>
       </div>
