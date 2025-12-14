@@ -1,5 +1,204 @@
 // frontend/src/components/editor/WorkflowsPanel.jsx
 import { useState, useMemo, useRef, useEffect } from 'react';
+const [showCreateModal, setShowCreateModal] = useState(false);
+const [showActionModal, setShowActionModal] = useState(false);
+const [newWorkflow, setNewWorkflow] = useState({
+  name: '',
+  trigger: { type: 'click', componentId: '' },
+});
+
+// Add these new states
+const [selectedNode, setSelectedNode] = useState(null);
+const [draggingNode, setDraggingNode] = useState(null);
+const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+const [connectingFrom, setConnectingFrom] = useState(null);
+const [tempConnection, setTempConnection] = useState(null);
+const canvasRef = useRef(null);
+
+const WorkflowNode = ({ node, isSelected, onMouseDown, onConnectionStart, onSelect }) => {
+  const actionType = actionTypes.find(a => a.id === node.data?.type);
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: node.position.x,
+        top: node.position.y,
+      }}
+      className={`bg-white rounded-lg shadow-lg border-2 p-3 cursor-move min-w-[180px] ${isSelected ? 'border-purple-500' : 'border-gray-300'
+        }`}
+      onMouseDown={(e) => onMouseDown(e, node)}
+      onClick={() => onSelect(node)}
+    >
+      {/* Input connection point */}
+      {node.type !== 'trigger' && (
+        <div
+          className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 bg-purple-600 rounded-full border-2 border-white cursor-pointer hover:scale-125 transition-transform"
+          onMouseDown={(e) => {
+            e.stopPropagation();
+          }}
+        />
+      )}
+
+      {/* Node content */}
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-xl">{node.type === 'trigger' ? '⚡' : actionType?.icon}</span>
+        <span className="font-semibold text-sm text-gray-900">
+          {node.type === 'trigger' ? 'Trigger' : actionType?.name}
+        </span>
+      </div>
+
+      {node.type === 'trigger' && (
+        <div className="text-xs text-gray-600">
+          {triggerTypes.find(t => t.id === node.data?.type)?.name}
+        </div>
+      )}
+
+      {/* Output connection point */}
+      <div
+        className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3 h-3 bg-purple-600 rounded-full border-2 border-white cursor-pointer hover:scale-125 transition-transform"
+        onMouseDown={(e) => {
+          e.stopPropagation();
+          onConnectionStart(e, node);
+        }}
+      />
+    </div>
+  );
+};
+
+const ConnectionLine = ({ from, to, connections, nodes }) => {
+  return (
+    <svg className="absolute inset-0 pointer-events-none" style={{ width: '100%', height: '100%' }}>
+      {connections.map((conn, i) => {
+        const fromNode = nodes.find(n => n.id === conn.from);
+        const toNode = nodes.find(n => n.id === conn.to);
+        if (!fromNode || !toNode) return null;
+
+        const x1 = fromNode.position.x + 180;
+        const y1 = fromNode.position.y + 40;
+        const x2 = toNode.position.x;
+        const y2 = toNode.position.y + 40;
+
+        return (
+          <line
+            key={i}
+            x1={x1}
+            y1={y1}
+            x2={x2}
+            y2={y2}
+            stroke="#9333ea"
+            strokeWidth="2"
+            markerEnd="url(#arrowhead)"
+          />
+        );
+      })}
+      <defs>
+        <marker
+          id="arrowhead"
+          markerWidth="10"
+          markerHeight="10"
+          refX="9"
+          refY="3"
+          orient="auto"
+        >
+          <polygon points="0 0, 10 3, 0 6" fill="#9333ea" />
+        </marker>
+      </defs>
+    </svg>
+  );
+};
+// Node dragging handlers
+const handleNodeMouseDown = (e, node) => {
+  if (!canvasRef.current) return;
+
+  const rect = canvasRef.current.getBoundingClientRect();
+  setDragOffset({
+    x: e.clientX - rect.left - node.position.x,
+    y: e.clientY - rect.top - node.position.y
+  });
+  setDraggingNode(node);
+};
+
+const handleCanvasMouseMove = (e) => {
+  if (!canvasRef.current) return;
+  const rect = canvasRef.current.getBoundingClientRect();
+
+  // Handle node dragging
+  if (draggingNode) {
+    const x = e.clientX - rect.left - dragOffset.x;
+    const y = e.clientY - rect.top - dragOffset.y;
+
+    const updatedNodes = selectedWorkflow.nodes.map(n =>
+      n.id === draggingNode.id ? { ...n, position: { x, y } } : n
+    );
+
+    onWorkflowUpdate(selectedWorkflow.id, { nodes: updatedNodes });
+  }
+
+  if (connectingFrom) {
+    setTempConnection({
+      x1: connectingFrom.x,
+      y1: connectingFrom.y,
+      x2: e.clientX - rect.left,
+      y2: e.clientY - rect.top
+    });
+  }
+};
+
+const handleCanvasMouseUp = (e) => {
+  if (connectingFrom) {
+    const nodes = selectedWorkflow.nodes || [];
+    const target = nodes.find(n => {
+      if (n.type === 'trigger' || n.id === connectingFrom.nodeId) return false;
+      const rect = canvasRef.current.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      return (
+        mouseX >= n.position.x - 10 &&
+        mouseX <= n.position.x + 10 &&
+        mouseY >= n.position.y + 30 &&
+        mouseY <= n.position.y + 50
+      );
+    });
+
+    if (target) {
+      const newConnection = { from: connectingFrom.nodeId, to: target.id };
+      const connections = selectedWorkflow.connections || [];
+      onWorkflowUpdate(selectedWorkflow.id, {
+        connections: [...connections, newConnection]
+      });
+    }
+  }
+
+  setDraggingNode(null);
+  setConnectingFrom(null);
+  setTempConnection(null);
+};
+
+const handleConnectionStart = (e, node) => {
+  e.stopPropagation();
+  const rect = canvasRef.current.getBoundingClientRect();
+  setConnectingFrom({
+    nodeId: node.id,
+    x: node.position.x + 180,
+    y: node.position.y + 40
+  });
+};
+useEffect(() => {
+  if (selectedWorkflow && (!selectedWorkflow.nodes || selectedWorkflow.nodes.length === 0)) {
+    const triggerNode = {
+      id: 'trigger-node',
+      type: 'trigger',
+      position: { x: 50, y: 50 },
+      data: selectedWorkflow.trigger
+    };
+
+    onWorkflowUpdate(selectedWorkflow.id, {
+      nodes: [triggerNode],
+      connections: []
+    });
+  }
+}, [selectedWorkflow]);
 const WorkflowsPanel = ({
   workflows = [],
   selectedWorkflow,
@@ -399,12 +598,15 @@ const WorkflowsPanel = ({
             )}
           </div>
         ) : (
-          // Workflow Editor
+          // Workflow Editor - Canvas Version
           <div className="flex flex-col h-full">
             {/* Back Button */}
             <div className="p-4 border-b border-gray-200">
               <button
-                onClick={() => onWorkflowSelect(null)}
+                onClick={() => {
+                  onWorkflowSelect(null);
+                  setSelectedNode(null);
+                }}
                 className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors mb-3"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -415,45 +617,83 @@ const WorkflowsPanel = ({
               <h3 className="text-lg font-bold text-gray-900">{selectedWorkflow.name}</h3>
             </div>
 
-            {/* Node Canvas */}
-            <div className="flex-1 overflow-y-auto p-4">
-              <div className="mb-4">
-                <h4 className="text-sm font-semibold text-gray-700 mb-2">When this happens:</h4>
-                <div className="p-3 bg-purple-50 border-2 border-purple-200 rounded-lg">
-                  <div className="text-sm font-medium">
-                    {triggerTypes.find(t => t.id === selectedWorkflow.trigger.type)?.icon}{' '}
-                    {triggerTypes.find(t => t.id === selectedWorkflow.trigger.type)?.name}
+            {/* Canvas */}
+            <div
+              ref={canvasRef}
+              className="flex-1 relative bg-gray-50 overflow-auto"
+              onMouseMove={handleCanvasMouseMove}
+              onMouseUp={handleCanvasMouseUp}
+              style={{
+                backgroundImage: 'radial-gradient(circle, #e5e7eb 1px, transparent 1px)',
+                backgroundSize: '20px 20px'
+              }}
+            >
+              {/* Connection Lines */}
+              <ConnectionLine
+                connections={selectedWorkflow.connections || []}
+                nodes={selectedWorkflow.nodes || []}
+              />
+
+              {/* Temporary connection line while dragging */}
+              {tempConnection && (
+                <svg className="absolute inset-0 pointer-events-none" style={{ width: '100%', height: '100%' }}>
+                  <line
+                    x1={tempConnection.x1}
+                    y1={tempConnection.y1}
+                    x2={tempConnection.x2}
+                    y2={tempConnection.y2}
+                    stroke="#9333ea"
+                    strokeWidth="2"
+                    strokeDasharray="5,5"
+                  />
+                </svg>
+              )}
+
+              {/* Nodes */}
+              {(selectedWorkflow.nodes || []).map(node => (
+                <WorkflowNode
+                  key={node.id}
+                  node={node}
+                  isSelected={selectedNode?.id === node.id}
+                  onMouseDown={handleNodeMouseDown}
+                  onConnectionStart={handleConnectionStart}
+                  onSelect={setSelectedNode}
+                />
+              ))}
+
+              {/* Empty state */}
+              {(!selectedWorkflow.nodes || selectedWorkflow.nodes.length <= 1) && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="text-center">
+                    <p className="text-gray-400 mb-2">Drag action nodes onto the canvas</p>
+                    <p className="text-sm text-gray-400">Connect them by dragging from ● to ●</p>
                   </div>
-                  {selectedWorkflow.trigger.componentId && (
-                    <div className="text-xs text-gray-600 mt-1">
-                      on {getComponentName(selectedWorkflow.trigger.componentId)}
-                    </div>
-                  )}
                 </div>
-              </div>
-
-              <div>
-                <h4 className="text-sm font-semibold text-gray-700 mb-2">Do these actions:</h4>
-                <div className="space-y-2">
-                  {(selectedWorkflow.actions || []).map((action, index) => (
-                    <div key={action.id} className="p-3 bg-white border-2 border-gray-200 rounded-lg">
-                    </div>
-                  ))}
-                </div>
-
-                <button
-                  onClick={() => setShowActionModal(true)}
-                  className="w-full mt-3 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-600 hover:border-purple-400 hover:text-purple-600"
-                >
-                  + Add Action
-                </button>
-              </div>
+              )}
             </div>
 
-            {/* Add Node Button */}
+            {/* Add Action Button */}
             <div className="p-4 border-t border-gray-200">
               <button
-                onClick={() => setShowActionModal(true)}
+                onClick={() => {
+                  const existingNodes = selectedWorkflow.nodes || [];
+                  const newNode = {
+                    id: `node-${Date.now()}`,
+                    type: 'action',
+                    position: {
+                      x: 100 + existingNodes.length * 220,
+                      y: 150
+                    },
+                    data: { type: action.id, name: action.name, config: { ...action.config } }
+                  };
+
+                  onWorkflowUpdate(selectedWorkflow.id, {
+                    nodes: [...existingNodes, newNode],
+                    connections: selectedWorkflow.connections || []
+                  });
+
+                  setShowActionModal(false);
+                }}
                 className="w-full px-4 py-3 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors"
               >
                 + Add Action Node

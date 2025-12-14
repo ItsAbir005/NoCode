@@ -128,6 +128,16 @@ const PropertiesPanel = ({
               </div>
             </div>
           </div>
+          
+          {/* Node Configuration - if a workflow node is selected */}
+          {selectedNode && selectedNode.type === 'action' && (
+            <div className="space-y-4 pt-6 border-t border-gray-200">
+              <h5 className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                Action Configuration
+              </h5>
+              {renderActionConfig(selectedNode)}
+            </div>
+          )}
 
           {/* Properties */}
           {selectedComponent.props && Object.keys(selectedComponent.props).length > 0 && (

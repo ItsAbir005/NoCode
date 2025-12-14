@@ -133,14 +133,14 @@ const ProjectEditor = ({ projectId }) => {
     }
   };
   useEffect(() => {
-  if (!loading && project) {
-    const autoSaveTimer = setTimeout(() => {
-      saveProject();
-    }, 2000);
+    if (!loading && project) {
+      const autoSaveTimer = setTimeout(() => {
+        saveProject();
+      }, 2000);
 
-    return () => clearTimeout(autoSaveTimer);
-  }
-}, [components.length, pages.length, workflows.length, selectedPage?.id]);
+      return () => clearTimeout(autoSaveTimer);
+    }
+  }, [components.length, pages.length, workflows.length, selectedPage?.id]);
 
   // Save project data
   const saveProject = async () => {
@@ -432,9 +432,12 @@ const ProjectEditor = ({ projectId }) => {
     if (!workflow) return;
 
     console.log(`Executing workflow: ${workflow.name}`);
+
+    // New node-based execution
     if (workflow.nodes && workflow.connections) {
       await executeNodeWorkflow(workflow, componentId);
     }
+    // Fallback to old action-based execution
     else if (workflow.actions) {
       for (const action of workflow.actions) {
         try {
@@ -447,14 +450,17 @@ const ProjectEditor = ({ projectId }) => {
       }
     }
   };
+
   const executeNodeWorkflow = async (workflow, componentId) => {
     const { nodes, connections } = workflow;
     const triggerNode = nodes.find(n => n.type === 'trigger');
     if (!triggerNode) return;
+
     const executionOrder = [];
     let currentNodeId = triggerNode.id;
     const visited = new Set();
 
+    // Follow connections to build execution order
     while (currentNodeId && !visited.has(currentNodeId)) {
       visited.add(currentNodeId);
       const node = nodes.find(n => n.id === currentNodeId);
@@ -462,9 +468,12 @@ const ProjectEditor = ({ projectId }) => {
       if (node && node.type === 'action') {
         executionOrder.push(node);
       }
+
       const nextConnection = connections.find(c => c.from === currentNodeId);
       currentNodeId = nextConnection?.to;
     }
+
+    // Execute nodes in order
     for (const node of executionOrder) {
       try {
         await executeAction(node.data, componentId);
