@@ -8,7 +8,6 @@ import {
   Box,
   Minus,
   FormInput,
-  ChevronDownSquare,
   CheckSquare,
   Circle,
   Upload,
@@ -20,19 +19,6 @@ import {
   Workflow,
   GripVertical,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
-
-/**
- * @typedef {Object} ComponentItem
- * @property {string} name
- * @property {React.ElementType} icon
- */
-
-/**
- * @typedef {Object} ComponentSection
- * @property {string} title
- * @property {ComponentItem[]} items
- */
 
 const componentSections = [
   {
@@ -49,7 +35,6 @@ const componentSections = [
     title: "Form Components",
     items: [
       { name: "Input", icon: FormInput },
-      { name: "Dropdown", icon: ChevronDownSquare },
       { name: "Checkbox", icon: CheckSquare },
       { name: "Radio", icon: Circle },
       { name: "File Upload", icon: Upload },
@@ -68,22 +53,14 @@ const componentSections = [
 
 const pages = ["Home", "Dashboard", "Settings"];
 
-function CollapsibleSection({
-  title,
-  children,
-  defaultOpen = true,
-}: {
-  title: string;
-  children: React.ReactNode;
-  defaultOpen?: boolean;
-}) {
+function CollapsibleSection({ title, children, defaultOpen = true }) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   return (
-    <div className="border-b border-border last:border-b-0">
+    <div className="border-b border-gray-200 last:border-b-0">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+        className="w-full flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors"
       >
         {isOpen ? (
           <ChevronDown className="w-4 h-4" />
@@ -97,22 +74,22 @@ function CollapsibleSection({
   );
 }
 
-function DraggableComponentItem({ item }: { item: ComponentItem }) {
+function DraggableComponentItem({ item }) {
   const Icon = item.icon;
 
-  const handleDragStart = (e: React.DragEvent) => {
+  const handleDragStart = (e) => {
     e.dataTransfer.setData("componentType", item.name);
     e.dataTransfer.effectAllowed = "copy";
   };
 
   return (
     <div
-      className="flex items-center gap-2 px-3 py-2 mx-2 rounded-md text-sm text-foreground hover:bg-muted cursor-grab active:cursor-grabbing transition-colors group"
+      className="flex items-center gap-2 px-3 py-2 mx-2 rounded-md text-sm text-gray-900 hover:bg-gray-100 cursor-grab active:cursor-grabbing transition-colors group"
       draggable
       onDragStart={handleDragStart}
     >
-      <GripVertical className="w-3 h-3 text-muted-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity" />
-      <Icon className="w-4 h-4 text-muted-foreground" />
+      <GripVertical className="w-3 h-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+      <Icon className="w-4 h-4 text-gray-600" />
       <span className="flex-1">{item.name}</span>
     </div>
   );
@@ -120,9 +97,9 @@ function DraggableComponentItem({ item }: { item: ComponentItem }) {
 
 export function LeftSidebar() {
   return (
-    <div className="h-full flex flex-col bg-card">
-      <div className="p-3 border-b border-border">
-        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+    <div className="h-full flex flex-col bg-white">
+      <div className="p-3 border-b border-gray-200">
+        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
           Components
         </h2>
       </div>
@@ -141,12 +118,11 @@ export function LeftSidebar() {
             {pages.map((page) => (
               <div
                 key={page}
-                className={cn(
-                  "flex items-center gap-2.5 px-3 py-2 rounded-md text-sm cursor-pointer transition-colors",
+                className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-sm cursor-pointer transition-colors ${
                   page === "Home"
-                    ? "bg-primary/10 text-primary"
-                    : "text-foreground hover:bg-muted"
-                )}
+                    ? "bg-indigo-50 text-indigo-600"
+                    : "text-gray-900 hover:bg-gray-100"
+                }`}
               >
                 <FileText className="w-4 h-4" />
                 {page}
@@ -156,7 +132,7 @@ export function LeftSidebar() {
         </CollapsibleSection>
 
         <CollapsibleSection title="Workflows" defaultOpen={false}>
-          <div className="px-4 py-2 text-sm text-muted-foreground">
+          <div className="px-4 py-2 text-sm text-gray-600">
             <div className="flex items-center gap-2 mb-2">
               <Workflow className="w-4 h-4" />
               No workflows yet

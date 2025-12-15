@@ -1,15 +1,5 @@
 import { Play, Upload, Bot, Edit2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { useState } from "react";
-
-interface TopBarProps {
-  projectName: string;
-  onProjectNameChange: (name: string) => void;
-  onPreview: () => void;
-  onPublish: () => void;
-  onToggleAI: () => void;
-  isAIOpen: boolean;
-}
 
 export function TopBar({
   projectName,
@@ -18,7 +8,7 @@ export function TopBar({
   onPublish,
   onToggleAI,
   isAIOpen,
-}: TopBarProps) {
+}) {
   const [isEditing, setIsEditing] = useState(false);
   const [tempName, setTempName] = useState(projectName);
 
@@ -28,10 +18,10 @@ export function TopBar({
   };
 
   return (
-    <header className="h-14 border-b border-border bg-card flex items-center justify-between px-4 shrink-0">
+    <header className="h-14 border-b border-gray-200 bg-white flex items-center justify-between px-4 shrink-0">
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-          <span className="text-primary-foreground font-bold text-sm">NC</span>
+        <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
+          <span className="text-white font-bold text-sm">NC</span>
         </div>
         
         {isEditing ? (
@@ -41,39 +31,48 @@ export function TopBar({
             onChange={(e) => setTempName(e.target.value)}
             onBlur={handleSave}
             onKeyDown={(e) => e.key === "Enter" && handleSave()}
-            className="bg-muted px-2 py-1 rounded text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary"
+            className="bg-gray-100 px-2 py-1 rounded text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-600"
             autoFocus
           />
         ) : (
           <button
             onClick={() => setIsEditing(true)}
-            className="flex items-center gap-2 hover:bg-muted px-2 py-1 rounded transition-colors"
+            className="flex items-center gap-2 hover:bg-gray-100 px-2 py-1 rounded transition-colors"
           >
-            <span className="font-medium text-foreground">{projectName}</span>
-            <Edit2 className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="font-medium text-gray-900">{projectName}</span>
+            <Edit2 className="w-3.5 h-3.5 text-gray-600" />
           </button>
         )}
       </div>
 
       <div className="flex items-center gap-2">
-        <Button variant="outline" size="sm" onClick={onPreview}>
-          <Play className="w-4 h-4 mr-1.5" />
-          Preview
-        </Button>
-        <Button size="sm" onClick={onPublish}>
-          <Upload className="w-4 h-4 mr-1.5" />
-          Publish
-        </Button>
-        <div className="w-px h-6 bg-border mx-1" />
-        <Button
-          variant={isAIOpen ? "secondary" : "ghost"}
-          size="sm"
-          onClick={onToggleAI}
+        <button
+          onClick={onPreview}
+          className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2"
         >
-          <Bot className="w-4 h-4 mr-1.5" />
+          <Play className="w-4 h-4" />
+          Preview
+        </button>
+        <button
+          onClick={onPublish}
+          className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 flex items-center gap-2"
+        >
+          <Upload className="w-4 h-4" />
+          Publish
+        </button>
+        <div className="w-px h-6 bg-gray-300 mx-1" />
+        <button
+          onClick={onToggleAI}
+          className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 ${
+            isAIOpen ? "bg-indigo-100 text-indigo-700" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+          }`}
+        >
+          <Bot className="w-4 h-4" />
           AI Assistant
-        </Button>
+        </button>
       </div>
     </header>
   );
 }
+
+export default TopBar;
