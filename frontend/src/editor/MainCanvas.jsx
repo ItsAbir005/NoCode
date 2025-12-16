@@ -1,12 +1,75 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { MousePointer2, ZoomIn, ZoomOut, Trash2 } from "lucide-react";
+import { MousePointer2, ZoomIn, ZoomOut, Trash2, Undo2, Redo2 } from "lucide-react";
 
-export function MainCanvas({ onSelectionChange }) {
+export function MainCanvas({ onSelectionChange, initialComponents = [], onComponentsChange }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const [zoom, setZoom] = useState(100);
-  const [components, setComponents] = useState([]);
+  const [components, setComponents] = useState(initialComponents);
   const [selectedId, setSelectedId] = useState(null);
+  const [history, setHistory] = useState([initialComponents]);
+  const [historyIndex, setHistoryIndex] = useState(0);
+  const [dragging, setDragging] = useState(null);
+  const [resizing, setResizing] = useState(null);
+
+  // Update components when initialComponents change
+  useEffect(() => {
+    if (initialComponents.length > 0 && components.length === 0) {
+      setComponents(initialComponents);
+      setHistory([initialComponents]);
+    }
+  }, [initialComponents]);
+
+  // Notify parent of components change
+  useEffect(() => {
+    if (onComponentsChange) {
+      onComponentsChange(components);
+    }
+  }, [components, onComponentsChange]);
+
+  // Add to history
+  const addToHistory = useCallback((newComponents) => {
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push(newComponents);
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+  }, [history, historyIndex]);
+
+  // Undo/Redo
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+      setHistoryIndex(historyIndex - 1);
+      setComponents(history[historyIndex - 1]);
+    }
+  };
+
+  const handleRedo = () => {
+    if (historyIndex < history.length - 1) {
+      setHistoryIndex(historyIndex + 1);
+      setComponents(history[historyIndex + 1]);
+    }
+  };
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        e.preventDefault();
+        handleRedo();
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedId && document.activeElement.tagName !== 'INPUT') {
+          e.preventDefault();
+          handleDelete();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedId, historyIndex]);
 
   const handleZoom = (direction) => {
     const newZoom = direction === "in" ? Math.min(zoom + 10, 200) : Math.max(zoom - 10, 50);
@@ -15,24 +78,26 @@ export function MainCanvas({ onSelectionChange }) {
 
   const handleDelete = () => {
     if (!selectedId) return;
-    setComponents(components.filter(c => c.id !== selectedId));
+    const newComponents = components.filter(c => c.id !== selectedId);
+    setComponents(newComponents);
+    addToHistory(newComponents);
     setSelectedId(null);
     onSelectionChange?.(null);
   };
 
   const createComponent = useCallback((type, x, y) => {
     const defaults = {
-      Button: { width: 120, height: 40, color: "#3b82f6", text: "Button" },
-      Text: { width: 200, height: 30, text: "Text Block" },
-      Input: { width: 200, height: 40, placeholder: "Enter text..." },
-      Container: { width: 300, height: 200, border: "2px dashed #9ca3af" },
-      Image: { width: 200, height: 150, bg: "#e5e7eb" },
-      Checkbox: { width: 20, height: 20 },
-      Radio: { width: 20, height: 20 },
-      "File Upload": { width: 200, height: 80, border: "2px dashed #9ca3af" },
-      Table: { width: 400, height: 200, border: "1px solid #e5e7eb" },
-      Chart: { width: 350, height: 250, bg: "#f0fdf4", border: "2px solid #22c55e" },
-      Card: { width: 280, height: 180, bg: "#ffffff", border: "1px solid #e5e7eb" },
+      Button: { width: 120, height: 40, color: "#3b82f6", text: "Button", textColor: "#ffffff", fontSize: 14 },
+      Text: { width: 200, height: 30, text: "Text Block", color: "#000000", fontSize: 16 },
+      Input: { width: 200, height: 40, placeholder: "Enter text...", borderColor: "#d1d5db", backgroundColor: "#ffffff" },
+      Container: { width: 300, height: 200, border: "2px dashed #9ca3af", backgroundColor: "transparent" },
+      Image: { width: 200, height: 150, bg: "#e5e7eb", src: "" },
+      Checkbox: { width: 20, height: 20, checked: false },
+      Radio: { width: 20, height: 20, checked: false },
+      "File Upload": { width: 200, height: 80, border: "2px dashed #9ca3af", backgroundColor: "#f9fafb" },
+      Table: { width: 400, height: 200, border: "1px solid #e5e7eb", backgroundColor: "#ffffff" },
+      Chart: { width: 350, height: 250, bg: "#f0fdf4", border: "2px solid #22c55e", chartType: "bar" },
+      Card: { width: 280, height: 180, bg: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 8 },
       List: { width: 250, height: 300, bg: "#ffffff", border: "1px solid #e5e7eb" },
       Divider: { width: 200, height: 2, bg: "#d1d5db" },
     };
@@ -58,109 +123,420 @@ export function MainCanvas({ onSelectionChange }) {
     const y = (e.clientY - rect.top) / (zoom / 100);
 
     const newComponent = createComponent(type, x, y);
-    setComponents([...components, newComponent]);
+    const newComponents = [...components, newComponent];
+    setComponents(newComponents);
+    addToHistory(newComponents);
     setSelectedId(newComponent.id);
     onSelectionChange?.(newComponent);
-  }, [components, zoom, createComponent, onSelectionChange]);
+  }, [components, zoom, createComponent, onSelectionChange, addToHistory]);
 
   const handleDragOver = (e) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "copy";
   };
 
-  const handleComponentClick = (component) => {
+  // Component dragging
+  const handleComponentMouseDown = (e, component) => {
+    if (e.button !== 0) return; // Only left click
+    e.stopPropagation();
+    
     setSelectedId(component.id);
     onSelectionChange?.(component);
+
+    const rect = canvasRef.current.getBoundingClientRect();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const componentStartX = component.x;
+    const componentStartY = component.y;
+
+    setDragging({
+      id: component.id,
+      startX,
+      startY,
+      componentStartX,
+      componentStartY
+    });
+  };
+
+  // Handle mouse move for dragging
+  useEffect(() => {
+    if (!dragging) return;
+
+    const handleMouseMove = (e) => {
+      const deltaX = (e.clientX - dragging.startX) / (zoom / 100);
+      const deltaY = (e.clientY - dragging.startY) / (zoom / 100);
+
+      setComponents(prev => 
+        prev.map(c => 
+          c.id === dragging.id
+            ? {
+                ...c,
+                x: Math.max(0, dragging.componentStartX + deltaX),
+                y: Math.max(0, dragging.componentStartY + deltaY)
+              }
+            : c
+        )
+      );
+    };
+
+    const handleMouseUp = () => {
+      setDragging(null);
+      addToHistory(components);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [dragging, zoom, components, addToHistory]);
+
+  // Handle resize
+  const handleResizeMouseDown = (e, component, direction) => {
+    e.stopPropagation();
+    
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startWidth = component.width;
+    const startHeight = component.height;
+    const startPosX = component.x;
+    const startPosY = component.y;
+
+    setResizing({
+      id: component.id,
+      direction,
+      startX,
+      startY,
+      startWidth,
+      startHeight,
+      startPosX,
+      startPosY
+    });
+  };
+
+  useEffect(() => {
+    if (!resizing) return;
+
+    const handleMouseMove = (e) => {
+      const deltaX = (e.clientX - resizing.startX) / (zoom / 100);
+      const deltaY = (e.clientY - resizing.startY) / (zoom / 100);
+
+      setComponents(prev =>
+        prev.map(c => {
+          if (c.id !== resizing.id) return c;
+
+          let updates = {};
+
+          switch (resizing.direction) {
+            case 'se': // Southeast (bottom-right)
+              updates = {
+                width: Math.max(20, resizing.startWidth + deltaX),
+                height: Math.max(20, resizing.startHeight + deltaY)
+              };
+              break;
+            case 'sw': // Southwest (bottom-left)
+              updates = {
+                width: Math.max(20, resizing.startWidth - deltaX),
+                height: Math.max(20, resizing.startHeight + deltaY),
+                x: resizing.startPosX + deltaX
+              };
+              break;
+            case 'ne': // Northeast (top-right)
+              updates = {
+                width: Math.max(20, resizing.startWidth + deltaX),
+                height: Math.max(20, resizing.startHeight - deltaY),
+                y: resizing.startPosY + deltaY
+              };
+              break;
+            case 'nw': // Northwest (top-left)
+              updates = {
+                width: Math.max(20, resizing.startWidth - deltaX),
+                height: Math.max(20, resizing.startHeight - deltaY),
+                x: resizing.startPosX + deltaX,
+                y: resizing.startPosY + deltaY
+              };
+              break;
+            case 'e': // East (right)
+              updates = {
+                width: Math.max(20, resizing.startWidth + deltaX)
+              };
+              break;
+            case 'w': // West (left)
+              updates = {
+                width: Math.max(20, resizing.startWidth - deltaX),
+                x: resizing.startPosX + deltaX
+              };
+              break;
+            case 's': // South (bottom)
+              updates = {
+                height: Math.max(20, resizing.startHeight + deltaY)
+              };
+              break;
+            case 'n': // North (top)
+              updates = {
+                height: Math.max(20, resizing.startHeight - deltaY),
+                y: resizing.startPosY + deltaY
+              };
+              break;
+          }
+
+          return { ...c, ...updates };
+        })
+      );
+    };
+
+    const handleMouseUp = () => {
+      setResizing(null);
+      addToHistory(components);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [resizing, zoom, components, addToHistory]);
+
+  // Update component property
+  const updateComponent = useCallback((id, updates) => {
+    const newComponents = components.map(c => 
+      c.id === id ? { ...c, ...updates } : c
+    );
+    setComponents(newComponents);
+    addToHistory(newComponents);
+    
+    // Update selection
+    const updated = newComponents.find(c => c.id === id);
+    if (updated) {
+      onSelectionChange?.(updated);
+    }
+  }, [components, addToHistory, onSelectionChange]);
+
+  // Expose update function
+  useEffect(() => {
+    window.__updateComponent = updateComponent;
+  }, [updateComponent]);
+
+  const renderResizeHandles = (component) => {
+    if (selectedId !== component.id) return null;
+
+    const handles = [
+      { dir: 'nw', cursor: 'nw-resize', top: -4, left: -4 },
+      { dir: 'n', cursor: 'n-resize', top: -4, left: '50%', transform: 'translateX(-50%)' },
+      { dir: 'ne', cursor: 'ne-resize', top: -4, right: -4 },
+      { dir: 'e', cursor: 'e-resize', top: '50%', right: -4, transform: 'translateY(-50%)' },
+      { dir: 'se', cursor: 'se-resize', bottom: -4, right: -4 },
+      { dir: 's', cursor: 's-resize', bottom: -4, left: '50%', transform: 'translateX(-50%)' },
+      { dir: 'sw', cursor: 'sw-resize', bottom: -4, left: -4 },
+      { dir: 'w', cursor: 'w-resize', top: '50%', left: -4, transform: 'translateY(-50%)' },
+    ];
+
+    return handles.map(handle => (
+      <div
+        key={handle.dir}
+        onMouseDown={(e) => handleResizeMouseDown(e, component, handle.dir)}
+        style={{
+          position: 'absolute',
+          width: 8,
+          height: 8,
+          backgroundColor: '#3b82f6',
+          border: '1px solid white',
+          borderRadius: '50%',
+          cursor: handle.cursor,
+          zIndex: 1000,
+          ...Object.fromEntries(
+            Object.entries(handle).filter(([key]) => 
+              ['top', 'left', 'right', 'bottom', 'transform'].includes(key)
+            )
+          )
+        }}
+      />
+    ));
   };
 
   const renderComponent = (component) => {
     const isSelected = selectedId === component.id;
-    const style = {
+    const baseStyle = {
       position: "absolute",
       left: component.x,
       top: component.y,
       width: component.width,
       height: component.height,
-      border: isSelected ? "2px solid #3b82f6" : component.border || "none",
-      cursor: "move",
-      backgroundColor: component.bg,
+      cursor: dragging?.id === component.id ? 'grabbing' : 'grab',
+      userSelect: 'none',
     };
+
+    const wrapperStyle = {
+      ...baseStyle,
+      border: isSelected ? "2px solid #3b82f6" : "1px solid transparent",
+      boxSizing: 'border-box',
+    };
+
+    let content;
 
     switch (component.type) {
       case "Button":
-        return (
+        content = (
           <button
-            key={component.id}
-            onClick={() => handleComponentClick(component)}
-            style={{ ...style, backgroundColor: component.color, color: "white", borderRadius: "6px", border: isSelected ? "2px solid #3b82f6" : "none" }}
+            style={{
+              width: '100%',
+              height: '100%',
+              backgroundColor: component.color,
+              color: component.textColor,
+              borderRadius: "6px",
+              border: "none",
+              fontSize: component.fontSize,
+              fontWeight: 500,
+              cursor: 'pointer'
+            }}
           >
             {component.text}
           </button>
         );
+        break;
       case "Text":
-        return (
+        content = (
           <div
-            key={component.id}
-            onClick={() => handleComponentClick(component)}
-            style={{ ...style, fontSize: "16px" }}
+            style={{
+              width: '100%',
+              height: '100%',
+              fontSize: component.fontSize,
+              color: component.color,
+              display: 'flex',
+              alignItems: 'center'
+            }}
           >
             {component.text}
           </div>
         );
+        break;
       case "Input":
-        return (
+        content = (
           <input
-            key={component.id}
-            onClick={() => handleComponentClick(component)}
             placeholder={component.placeholder}
-            style={{ ...style, padding: "8px", border: isSelected ? "2px solid #3b82f6" : "1px solid #d1d5db", borderRadius: "6px" }}
+            style={{
+              width: '100%',
+              height: '100%',
+              padding: "8px",
+              border: `1px solid ${component.borderColor}`,
+              borderRadius: "6px",
+              backgroundColor: component.backgroundColor,
+              fontSize: 14
+            }}
           />
         );
+        break;
       case "Container":
-        return (
+        content = (
           <div
-            key={component.id}
-            onClick={() => handleComponentClick(component)}
-            style={{ ...style, backgroundColor: "transparent", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af" }}
+            style={{
+              width: '100%',
+              height: '100%',
+              backgroundColor: component.backgroundColor,
+              border: component.border,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#9ca3af",
+              borderRadius: component.borderRadius || 0
+            }}
           >
             Container
           </div>
         );
+        break;
       case "Image":
-        return (
+        content = (
           <div
-            key={component.id}
-            onClick={() => handleComponentClick(component)}
-            style={{ ...style, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "4px" }}
+            style={{
+              width: '100%',
+              height: '100%',
+              backgroundColor: component.bg,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: "4px"
+            }}
           >
-            <span className="text-gray-500">Image</span>
+            <span style={{ color: '#6b7280' }}>Image</span>
           </div>
         );
+        break;
       case "Divider":
-        return (
+        content = (
           <div
-            key={component.id}
-            onClick={() => handleComponentClick(component)}
-            style={style}
+            style={{
+              width: '100%',
+              height: '100%',
+              backgroundColor: component.bg
+            }}
           />
         );
+        break;
       default:
-        return (
+        content = (
           <div
-            key={component.id}
-            onClick={() => handleComponentClick(component)}
-            style={{ ...style, display: "flex", alignItems: "center", justifyContent: "center", color: "#6b7280" }}
+            style={{
+              width: '100%',
+              height: '100%',
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#6b7280",
+              border: component.border,
+              backgroundColor: component.bg || component.backgroundColor,
+              borderRadius: component.borderRadius || 0
+            }}
           >
             {component.type}
           </div>
         );
     }
+
+    return (
+      <div
+        key={component.id}
+        style={wrapperStyle}
+        onMouseDown={(e) => handleComponentMouseDown(e, component)}
+        onClick={(e) => {
+          e.stopPropagation();
+          setSelectedId(component.id);
+          onSelectionChange?.(component);
+        }}
+      >
+        {content}
+        {renderResizeHandles(component)}
+      </div>
+    );
   };
 
   return (
     <div className="h-full bg-gray-50 flex flex-col">
       <div className="h-10 border-b border-gray-200 bg-white flex items-center justify-between px-3 shrink-0">
         <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <button 
+              onClick={handleUndo} 
+              disabled={historyIndex === 0}
+              className="p-1 hover:bg-gray-100 rounded disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Undo (Ctrl+Z)"
+            >
+              <Undo2 className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={handleRedo}
+              disabled={historyIndex === history.length - 1}
+              className="p-1 hover:bg-gray-100 rounded disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Redo (Ctrl+Y)"
+            >
+              <Redo2 className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="w-px h-4 bg-gray-300" />
           <span className="text-xs text-gray-600">Zoom: {zoom}%</span>
           <div className="flex items-center gap-1">
             <button onClick={() => handleZoom("out")} className="p-1 hover:bg-gray-100 rounded">
@@ -175,7 +551,11 @@ export function MainCanvas({ onSelectionChange }) {
           <div className="w-px h-4 bg-gray-300" />
           <span className="text-xs text-gray-600">{components.length} components</span>
         </div>
-        <button onClick={handleDelete} className="px-2 py-1 text-red-600 hover:bg-red-50 rounded text-sm flex items-center gap-1">
+        <button 
+          onClick={handleDelete} 
+          disabled={!selectedId}
+          className="px-2 py-1 text-red-600 hover:bg-red-50 rounded text-sm flex items-center gap-1 disabled:opacity-30 disabled:cursor-not-allowed"
+        >
           <Trash2 className="w-4 h-4" />
           Delete
         </button>
@@ -186,6 +566,10 @@ export function MainCanvas({ onSelectionChange }) {
         className="flex-1 overflow-auto p-8"
         onDrop={handleDrop}
         onDragOver={handleDragOver}
+        onClick={() => {
+          setSelectedId(null);
+          onSelectionChange?.(null);
+        }}
       >
         <div
           ref={canvasRef}
