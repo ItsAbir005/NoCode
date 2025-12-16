@@ -8,6 +8,7 @@ export function TopBar({
   onPublish,
   onToggleAI,
   isAIOpen,
+  saveStatus,
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [tempName, setTempName] = useState(projectName);
@@ -42,6 +43,13 @@ export function TopBar({
             <span className="font-medium text-gray-900">{projectName}</span>
             <Edit2 className="w-3.5 h-3.5 text-gray-600" />
           </button>
+        )}
+
+        {saveStatus && (
+          <>
+            <div className="w-px h-6 bg-gray-300" />
+            {saveStatus}
+          </>
         )}
       </div>
 
