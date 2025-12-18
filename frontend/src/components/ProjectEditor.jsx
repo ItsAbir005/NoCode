@@ -11,8 +11,8 @@ import { Cloud, CloudOff, AlertCircle, Loader2 } from 'lucide-react';
 
 const ProjectEditor = ({ projectId }) => {
   const [isAIOpen, setIsAIOpen] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const navigate = useNavigate();
-
   const {
     project,
     components,
@@ -89,6 +89,20 @@ const ProjectEditor = ({ projectId }) => {
         return null;
     }
   };
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+        e.preventDefault();
+        handlePreview();
+      }
+      if (e.key === 'Escape' && showPreview) {
+        setShowPreview(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showPreview]);
 
   if (loading) {
     return (
