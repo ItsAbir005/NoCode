@@ -87,19 +87,177 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
 
   const createComponent = useCallback((type, x, y) => {
     const defaults = {
-      Button: { width: 120, height: 40, color: "#3b82f6", text: "Button", textColor: "#ffffff", fontSize: 14 },
-      Text: { width: 200, height: 30, text: "Text Block", color: "#000000", fontSize: 16 },
-      Input: { width: 200, height: 40, placeholder: "Enter text...", borderColor: "#d1d5db", backgroundColor: "#ffffff" },
-      Container: { width: 300, height: 200, border: "2px dashed #9ca3af", backgroundColor: "transparent" },
-      Image: { width: 200, height: 150, bg: "#e5e7eb", src: "" },
-      Checkbox: { width: 20, height: 20, checked: false },
-      Radio: { width: 20, height: 20, checked: false },
-      "File Upload": { width: 200, height: 80, border: "2px dashed #9ca3af", backgroundColor: "#f9fafb" },
-      Table: { width: 400, height: 200, border: "1px solid #e5e7eb", backgroundColor: "#ffffff" },
-      Chart: { width: 350, height: 250, bg: "#f0fdf4", border: "2px solid #22c55e", chartType: "bar" },
-      Card: { width: 280, height: 180, bg: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 8 },
-      List: { width: 250, height: 300, bg: "#ffffff", border: "1px solid #e5e7eb" },
-      Divider: { width: 200, height: 2, bg: "#d1d5db" },
+      // Existing components
+      Button: {
+        width: 120, height: 40,
+        color: "#3b82f6",
+        text: "Button",
+        textColor: "#ffffff",
+        fontSize: 14
+      },
+      Text: {
+        width: 200, height: 30,
+        text: "Text Block",
+        color: "#000000",
+        fontSize: 16
+      },
+      Input: {
+        width: 200, height: 40,
+        placeholder: "Enter text...",
+        borderColor: "#d1d5db",
+        backgroundColor: "#ffffff"
+      },
+      Container: {
+        width: 300, height: 200,
+        border: "2px dashed #9ca3af",
+        backgroundColor: "transparent"
+      },
+      Image: {
+        width: 200, height: 150,
+        bg: "#e5e7eb",
+        src: ""
+      },
+      Checkbox: {
+        width: 20, height: 20,
+        checked: false
+      },
+      Radio: {
+        width: 20, height: 20,
+        checked: false
+      },
+      "File Upload": {
+        width: 200, height: 80,
+        border: "2px dashed #9ca3af",
+        backgroundColor: "#f9fafb"
+      },
+      Divider: {
+        width: 200, height: 2,
+        bg: "#d1d5db"
+      },
+
+      // NEW COMPONENTS
+      Textarea: {
+        width: 300, height: 120,
+        placeholder: "Enter text...",
+        borderColor: "#d1d5db",
+        backgroundColor: "#ffffff"
+      },
+      Select: {
+        width: 200, height: 40,
+        options: ["Option 1", "Option 2", "Option 3"],
+        borderColor: "#d1d5db",
+        backgroundColor: "#ffffff"
+      },
+      "Date Picker": {
+        width: 200, height: 40,
+        borderColor: "#d1d5db",
+        backgroundColor: "#ffffff"
+      },
+      Navbar: {
+        width: 1024, height: 60,
+        backgroundColor: "#1f2937",
+        color: "#ffffff"
+      },
+      Sidebar: {
+        width: 250, height: 600,
+        backgroundColor: "#f9fafb",
+        border: "1px solid #e5e7eb"
+      },
+      Breadcrumbs: {
+        width: 300, height: 30,
+        color: "#6b7280",
+        fontSize: 14
+      },
+      Tabs: {
+        width: 400, height: 40,
+        borderColor: "#e5e7eb"
+      },
+      Pagination: {
+        width: 300, height: 40
+      },
+      Table: {
+        width: 400, height: 200,
+        border: "1px solid #e5e7eb",
+        backgroundColor: "#ffffff"
+      },
+      Chart: {
+        width: 350, height: 250,
+        bg: "#f0fdf4",
+        border: "2px solid #22c55e",
+        chartType: "bar"
+      },
+      Card: {
+        width: 280, height: 180,
+        bg: "#ffffff",
+        border: "1px solid #e5e7eb",
+        borderRadius: 8
+      },
+      List: {
+        width: 250, height: 300,
+        bg: "#ffffff",
+        border: "1px solid #e5e7eb"
+      },
+      Badge: {
+        width: 80, height: 24,
+        backgroundColor: "#3b82f6",
+        color: "#ffffff",
+        text: "Badge",
+        fontSize: 12,
+        borderRadius: 12
+      },
+      Avatar: {
+        width: 40, height: 40,
+        backgroundColor: "#e5e7eb",
+        borderRadius: 20
+      },
+      Alert: {
+        width: 400, height: 60,
+        backgroundColor: "#dbeafe",
+        border: "1px solid #3b82f6",
+        borderRadius: 8,
+        text: "This is an alert message"
+      },
+      Modal: {
+        width: 400, height: 300,
+        backgroundColor: "#ffffff",
+        border: "1px solid #e5e7eb",
+        borderRadius: 12,
+        boxShadow: "0 10px 25px rgba(0,0,0,0.1)"
+      },
+      Toast: {
+        width: 300, height: 60,
+        backgroundColor: "#ffffff",
+        border: "1px solid #e5e7eb",
+        borderRadius: 8,
+        boxShadow: "0 4px 6px rgba(0,0,0,0.1)"
+      },
+      "Progress Bar": {
+        width: 300, height: 8,
+        backgroundColor: "#e5e7eb",
+        progressColor: "#3b82f6",
+        progress: 60,
+        borderRadius: 4
+      },
+      Spinner: {
+        width: 40, height: 40,
+        color: "#3b82f6"
+      },
+      "Icon Button": {
+        width: 40, height: 40,
+        backgroundColor: "#3b82f6",
+        borderRadius: 8
+      },
+      "Video Player": {
+        width: 640, height: 360,
+        backgroundColor: "#000000",
+        borderRadius: 8
+      },
+      "Audio Player": {
+        width: 300, height: 60,
+        backgroundColor: "#f9fafb",
+        border: "1px solid #e5e7eb",
+        borderRadius: 8
+      },
     };
 
     return {
@@ -110,7 +268,6 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
       ...defaults[type]
     };
   }, []);
-
   const handleDrop = useCallback((e) => {
     e.preventDefault();
     if (!containerRef.current) return;
@@ -139,7 +296,7 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
   const handleComponentMouseDown = (e, component) => {
     if (e.button !== 0) return; // Only left click
     e.stopPropagation();
-    
+
     setSelectedId(component.id);
     onSelectionChange?.(component);
 
@@ -166,14 +323,14 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
       const deltaX = (e.clientX - dragging.startX) / (zoom / 100);
       const deltaY = (e.clientY - dragging.startY) / (zoom / 100);
 
-      setComponents(prev => 
-        prev.map(c => 
+      setComponents(prev =>
+        prev.map(c =>
           c.id === dragging.id
             ? {
-                ...c,
-                x: Math.max(0, dragging.componentStartX + deltaX),
-                y: Math.max(0, dragging.componentStartY + deltaY)
-              }
+              ...c,
+              x: Math.max(0, dragging.componentStartX + deltaX),
+              y: Math.max(0, dragging.componentStartY + deltaY)
+            }
             : c
         )
       );
@@ -196,7 +353,7 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
   // Handle resize
   const handleResizeMouseDown = (e, component, direction) => {
     e.stopPropagation();
-    
+
     const startX = e.clientX;
     const startY = e.clientY;
     const startWidth = component.width;
@@ -303,12 +460,12 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
 
   // Update component property
   const updateComponent = useCallback((id, updates) => {
-    const newComponents = components.map(c => 
+    const newComponents = components.map(c =>
       c.id === id ? { ...c, ...updates } : c
     );
     setComponents(newComponents);
     addToHistory(newComponents);
-    
+
     // Update selection
     const updated = newComponents.find(c => c.id === id);
     if (updated) {
@@ -349,7 +506,7 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
           cursor: handle.cursor,
           zIndex: 1000,
           ...Object.fromEntries(
-            Object.entries(handle).filter(([key]) => 
+            Object.entries(handle).filter(([key]) =>
               ['top', 'left', 'right', 'bottom', 'transform'].includes(key)
             )
           )
@@ -519,15 +676,15 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
       <div className="h-10 border-b border-gray-200 bg-white flex items-center justify-between px-3 shrink-0">
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1">
-            <button 
-              onClick={handleUndo} 
+            <button
+              onClick={handleUndo}
               disabled={historyIndex === 0}
               className="p-1 hover:bg-gray-100 rounded disabled:opacity-30 disabled:cursor-not-allowed"
               title="Undo (Ctrl+Z)"
             >
               <Undo2 className="w-4 h-4" />
             </button>
-            <button 
+            <button
               onClick={handleRedo}
               disabled={historyIndex === history.length - 1}
               className="p-1 hover:bg-gray-100 rounded disabled:opacity-30 disabled:cursor-not-allowed"
@@ -551,8 +708,8 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
           <div className="w-px h-4 bg-gray-300" />
           <span className="text-xs text-gray-600">{components.length} components</span>
         </div>
-        <button 
-          onClick={handleDelete} 
+        <button
+          onClick={handleDelete}
           disabled={!selectedId}
           className="px-2 py-1 text-red-600 hover:bg-red-50 rounded text-sm flex items-center gap-1 disabled:opacity-30 disabled:cursor-not-allowed"
         >

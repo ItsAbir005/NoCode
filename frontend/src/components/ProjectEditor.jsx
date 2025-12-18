@@ -6,6 +6,7 @@ import { LeftSidebar } from '../editor/LeftSidebar';
 import { MainCanvas } from '../editor/MainCanvas';
 import { RightSidebar } from '../editor/RightSidebar';
 import { AIChatPanel } from '../editor/AIChatPanel';
+import { PreviewMode } from './PreviewMode';
 import { Cloud, CloudOff, AlertCircle, Loader2 } from 'lucide-react';
 
 const ProjectEditor = ({ projectId }) => {
@@ -33,17 +34,17 @@ const ProjectEditor = ({ projectId }) => {
     await updateProjectMetadata({ name: newName });
   };
 
-  const handlePreview = async () => {
-    await manualSave();
-    alert('Preview mode coming soon!');
+  const handlePreview = () => {
+    setShowPreview(true);
   };
 
+
   const handlePublish = async () => {
-    const success = await updateProjectMetadata({ 
+    const success = await updateProjectMetadata({
       status: 'active',
-      components 
+      components
     });
-    
+
     if (success) {
       alert('Project published successfully!');
     } else {
@@ -76,7 +77,7 @@ const ProjectEditor = ({ projectId }) => {
         );
       case 'error':
         return (
-          <button 
+          <button
             onClick={manualSave}
             className="flex items-center gap-2 text-xs text-red-600 hover:text-red-700 transition-colors"
           >
@@ -138,7 +139,7 @@ const ProjectEditor = ({ projectId }) => {
         </div>
 
         <div className="flex-1">
-          <MainCanvas 
+          <MainCanvas
             components={components}
             onComponentsChange={updateComponents}
             selectedComponent={selectedComponent}
@@ -147,10 +148,10 @@ const ProjectEditor = ({ projectId }) => {
         </div>
 
         <div className="w-80 border-l border-gray-200 bg-white">
-          <RightSidebar 
+          <RightSidebar
             selectedComponent={selectedComponent}
             onUpdateComponent={(id, updates) => {
-              const updated = components.map(c => 
+              const updated = components.map(c =>
                 c.id === id ? { ...c, ...updates } : c
               );
               updateComponents(updated);
@@ -160,6 +161,13 @@ const ProjectEditor = ({ projectId }) => {
       </div>
 
       <AIChatPanel isOpen={isAIOpen} onClose={() => setIsAIOpen(false)} />
+      {showPreview && (
+        <PreviewMode
+          components={components}
+          projectName={project.name}
+          onClose={() => setShowPreview(false)}
+        />
+      )}
     </div>
   );
 };
