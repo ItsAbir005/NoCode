@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProjectEditor } from '../hooks/useProjectEditor';
 import { TopBar } from '../editor/TopBar';

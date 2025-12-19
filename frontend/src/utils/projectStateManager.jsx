@@ -56,9 +56,8 @@ class ProjectStateManager {
       return { success: false, error: error.message };
     }
   }
-
   // Auto-save with debounce
-  autoSave(data, delay = 2000) {
+  autoSave(data, delay = 2000, onStatusChange) {
     this.isDirty = true;
     
     if (this.saveTimeout) {
@@ -66,9 +65,13 @@ class ProjectStateManager {
     }
 
     this.saveTimeout = setTimeout(async () => {
+      if (onStatusChange) onStatusChange('saving');
       const result = await this.saveProject(data);
       if (result.success) {
         console.log('Auto-saved at', new Date().toLocaleTimeString());
+        if (onStatusChange) onStatusChange('saved');
+      } else {
+        if (onStatusChange) onStatusChange('error');
       }
     }, delay);
   }
@@ -76,7 +79,7 @@ class ProjectStateManager {
   // Start periodic auto-save (every 30 seconds)
   startPeriodicSave(getData, interval = 30000) {
     this.stopPeriodicSave(); // Clear existing interval
-    
+
     this.saveInterval = setInterval(async () => {
       if (this.isDirty) {
         const data = getData();
@@ -104,10 +107,10 @@ class ProjectStateManager {
   // Get last save time formatted
   getLastSaveFormatted() {
     if (!this.lastSaveTime) return 'Never';
-    
+
     const now = new Date();
     const diff = Math.floor((now - this.lastSaveTime) / 1000);
-    
+
     if (diff < 10) return 'just now';
     if (diff < 60) return `${diff}s ago`;
     if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;

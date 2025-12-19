@@ -10,7 +10,7 @@ export function useProjectEditor(projectId) {
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [selectedComponent, setSelectedComponent] = useState(null);
-  
+
   const stateManager = useRef(null);
   const navigate = useNavigate();
 
@@ -30,22 +30,22 @@ export function useProjectEditor(projectId) {
   const loadProject = async () => {
     setLoading(true);
     const result = await stateManager.current.loadProject();
-    
+
     if (result.success) {
       setProject(result.data);
-      
+
       // Parse components
       let loadedComponents = [];
       if (result.data.pages) {
         try {
-          loadedComponents = typeof result.data.pages === 'string' 
-            ? JSON.parse(result.data.pages) 
+          loadedComponents = typeof result.data.pages === 'string'
+            ? JSON.parse(result.data.pages)
             : result.data.pages;
         } catch (e) {
           console.error('Error parsing components:', e);
         }
       }
-      
+
       setComponents(Array.isArray(loadedComponents) ? loadedComponents : []);
       setHistory([loadedComponents]);
       setHistoryIndex(0);
@@ -54,14 +54,14 @@ export function useProjectEditor(projectId) {
       alert('Failed to load project');
       navigate('/dashboard');
     }
-    
+
     setLoading(false);
   };
 
   // Save project
   const saveProject = useCallback(async (data) => {
     setSaveStatus('saving');
-    
+
     const saveData = {
       pages: JSON.stringify(data.components || components),
       components: JSON.stringify(data.components || components),
@@ -69,7 +69,7 @@ export function useProjectEditor(projectId) {
     };
 
     const result = await stateManager.current.saveProject(saveData);
-    
+
     if (result.success) {
       setSaveStatus('saved');
       if (result.data) {
@@ -86,7 +86,7 @@ export function useProjectEditor(projectId) {
   const updateComponents = useCallback((newComponents) => {
     setComponents(newComponents);
     setSaveStatus('unsaved');
-    
+
     // Add to history
     setHistory(prev => {
       const newHistory = prev.slice(0, historyIndex + 1);
@@ -95,10 +95,12 @@ export function useProjectEditor(projectId) {
     });
     setHistoryIndex(prev => Math.min(prev + 1, 49));
 
-    // Trigger auto-save
-    stateManager.current.autoSave({
-      components: newComponents
-    });
+    // Trigger auto-save with status callback
+    stateManager.current.autoSave(
+      { components: newComponents },
+      2000,
+      (status) => setSaveStatus(status)
+    );
   }, [historyIndex]);
 
   // Undo
