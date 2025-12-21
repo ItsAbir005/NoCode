@@ -56,6 +56,7 @@ class ProjectStateManager {
       return { success: false, error: error.message };
     }
   }
+  
   // Auto-save with debounce
   autoSave(data, delay = 2000, onStatusChange) {
     this.isDirty = true;
