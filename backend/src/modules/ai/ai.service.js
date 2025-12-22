@@ -1,6 +1,6 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash', temperature: 0.7 });
 const COMPONENT_TYPES = {
   Button: { hasText: true, hasColor: true, hasSize: true },
   Text: { hasText: true, hasColor: true, fontSize: true },

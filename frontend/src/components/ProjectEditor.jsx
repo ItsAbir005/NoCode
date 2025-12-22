@@ -174,7 +174,15 @@ const ProjectEditor = ({ projectId }) => {
         </div>
       </div>
 
-      <AIChatPanel isOpen={isAIOpen} onClose={() => setIsAIOpen(false)} />
+      <AIChatPanel
+        isOpen={isAIOpen}
+        onClose={() => setIsAIOpen(false)}
+        existingComponents={components}
+        onComponentsGenerated={(newComponents) => {
+          updateComponents([...components, ...newComponents]);
+          alert(`Added ${newComponents.length} components to canvas!`);
+        }}
+      />
       {showPreview && (
         <PreviewMode
           components={components}
