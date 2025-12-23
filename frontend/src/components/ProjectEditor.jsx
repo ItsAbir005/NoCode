@@ -38,7 +38,6 @@ const ProjectEditor = ({ projectId }) => {
     setShowPreview(true);
   };
 
-
   const handlePublish = async () => {
     const success = await updateProjectMetadata({
       status: 'active',
@@ -50,6 +49,23 @@ const ProjectEditor = ({ projectId }) => {
     } else {
       alert('Failed to publish project');
     }
+  };
+
+  // FIXED: Handle AI component generation
+  const handleComponentsGenerated = (newComponents) => {
+    console.log('AI generated components:', newComponents);
+    
+    // Merge with existing components
+    const merged = [...components, ...newComponents];
+    console.log('Merged components:', merged);
+    
+    // Update via the hook which handles saving
+    updateComponents(merged);
+    
+    // Show success message
+    setTimeout(() => {
+      alert(`✨ Added ${newComponents.length} component${newComponents.length > 1 ? 's' : ''} to canvas!`);
+    }, 100);
   };
 
   const SaveStatusIndicator = () => {
@@ -89,6 +105,7 @@ const ProjectEditor = ({ projectId }) => {
         return null;
     }
   };
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
@@ -131,6 +148,9 @@ const ProjectEditor = ({ projectId }) => {
     );
   }
 
+  // Debug log
+  console.log('Current components count:', components.length);
+
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       <TopBar
@@ -154,7 +174,7 @@ const ProjectEditor = ({ projectId }) => {
 
         <div className="flex-1">
           <MainCanvas
-            components={components}
+            initialComponents={components}
             onComponentsChange={updateComponents}
             selectedComponent={selectedComponent}
             onSelectionChange={setSelectedComponent}
@@ -178,11 +198,9 @@ const ProjectEditor = ({ projectId }) => {
         isOpen={isAIOpen}
         onClose={() => setIsAIOpen(false)}
         existingComponents={components}
-        onComponentsGenerated={(newComponents) => {
-          updateComponents([...components, ...newComponents]);
-          alert(`Added ${newComponents.length} components to canvas!`);
-        }}
+        onComponentsGenerated={handleComponentsGenerated}
       />
+
       {showPreview && (
         <PreviewMode
           components={components}

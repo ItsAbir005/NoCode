@@ -12,11 +12,13 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
   const [dragging, setDragging] = useState(null);
   const [resizing, setResizing] = useState(null);
 
-  // Update components when initialComponents change
+  // FIX: Update components when initialComponents change
   useEffect(() => {
-    if (initialComponents.length > 0 && components.length === 0) {
-      setComponents(initialComponents);
-      setHistory([initialComponents]);
+    setComponents(initialComponents);
+    // Only update history if components actually changed
+    if (JSON.stringify(initialComponents) !== JSON.stringify(components)) {
+      setHistory(prev => [...prev, initialComponents]);
+      setHistoryIndex(prev => prev + 1);
     }
   }, [initialComponents]);
 
@@ -87,7 +89,6 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
 
   const createComponent = useCallback((type, x, y) => {
     const defaults = {
-      // Existing components
       Button: {
         width: 120, height: 40,
         color: "#3b82f6",
@@ -134,81 +135,16 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
         width: 200, height: 2,
         bg: "#d1d5db"
       },
-
-      // NEW COMPONENTS
-      Textarea: {
-        width: 300, height: 120,
-        placeholder: "Enter text...",
-        borderColor: "#d1d5db",
-        backgroundColor: "#ffffff"
-      },
-      Select: {
-        width: 200, height: 40,
-        options: ["Option 1", "Option 2", "Option 3"],
-        borderColor: "#d1d5db",
-        backgroundColor: "#ffffff"
-      },
-      "Date Picker": {
-        width: 200, height: 40,
-        borderColor: "#d1d5db",
-        backgroundColor: "#ffffff"
-      },
-      Navbar: {
-        width: 1024, height: 60,
-        backgroundColor: "#1f2937",
-        color: "#ffffff"
-      },
-      Sidebar: {
-        width: 250, height: 600,
-        backgroundColor: "#f9fafb",
-        border: "1px solid #e5e7eb"
-      },
-      Breadcrumbs: {
-        width: 300, height: 30,
-        color: "#6b7280",
-        fontSize: 14
-      },
-      Tabs: {
-        width: 400, height: 40,
-        borderColor: "#e5e7eb"
-      },
-      Pagination: {
-        width: 300, height: 40
-      },
-      Table: {
-        width: 400, height: 200,
-        border: "1px solid #e5e7eb",
-        backgroundColor: "#ffffff"
-      },
-      Chart: {
-        width: 350, height: 250,
-        bg: "#f0fdf4",
-        border: "2px solid #22c55e",
-        chartType: "bar"
-      },
       Card: {
         width: 280, height: 180,
         bg: "#ffffff",
         border: "1px solid #e5e7eb",
         borderRadius: 8
       },
-      List: {
-        width: 250, height: 300,
-        bg: "#ffffff",
-        border: "1px solid #e5e7eb"
-      },
-      Badge: {
-        width: 80, height: 24,
-        backgroundColor: "#3b82f6",
-        color: "#ffffff",
-        text: "Badge",
-        fontSize: 12,
-        borderRadius: 12
-      },
-      Avatar: {
-        width: 40, height: 40,
-        backgroundColor: "#e5e7eb",
-        borderRadius: 20
+      Table: {
+        width: 400, height: 200,
+        border: "1px solid #e5e7eb",
+        backgroundColor: "#ffffff"
       },
       Alert: {
         width: 400, height: 60,
@@ -217,46 +153,10 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
         borderRadius: 8,
         text: "This is an alert message"
       },
-      Modal: {
-        width: 400, height: 300,
-        backgroundColor: "#ffffff",
-        border: "1px solid #e5e7eb",
-        borderRadius: 12,
-        boxShadow: "0 10px 25px rgba(0,0,0,0.1)"
-      },
-      Toast: {
-        width: 300, height: 60,
-        backgroundColor: "#ffffff",
-        border: "1px solid #e5e7eb",
-        borderRadius: 8,
-        boxShadow: "0 4px 6px rgba(0,0,0,0.1)"
-      },
-      "Progress Bar": {
-        width: 300, height: 8,
-        backgroundColor: "#e5e7eb",
-        progressColor: "#3b82f6",
-        progress: 60,
-        borderRadius: 4
-      },
-      Spinner: {
-        width: 40, height: 40,
-        color: "#3b82f6"
-      },
-      "Icon Button": {
-        width: 40, height: 40,
-        backgroundColor: "#3b82f6",
-        borderRadius: 8
-      },
-      "Video Player": {
-        width: 640, height: 360,
-        backgroundColor: "#000000",
-        borderRadius: 8
-      },
-      "Audio Player": {
-        width: 300, height: 60,
-        backgroundColor: "#f9fafb",
-        border: "1px solid #e5e7eb",
-        borderRadius: 8
+      Navbar: {
+        width: 1024, height: 60,
+        backgroundColor: "#1f2937",
+        color: "#ffffff"
       },
     };
 
@@ -268,6 +168,7 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
       ...defaults[type]
     };
   }, []);
+
   const handleDrop = useCallback((e) => {
     e.preventDefault();
     if (!containerRef.current) return;
@@ -294,13 +195,12 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
 
   // Component dragging
   const handleComponentMouseDown = (e, component) => {
-    if (e.button !== 0) return; // Only left click
+    if (e.button !== 0) return;
     e.stopPropagation();
 
     setSelectedId(component.id);
     onSelectionChange?.(component);
 
-    const rect = canvasRef.current.getBoundingClientRect();
     const startX = e.clientX;
     const startY = e.clientY;
     const componentStartX = component.x;
@@ -387,27 +287,27 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
           let updates = {};
 
           switch (resizing.direction) {
-            case 'se': // Southeast (bottom-right)
+            case 'se':
               updates = {
                 width: Math.max(20, resizing.startWidth + deltaX),
                 height: Math.max(20, resizing.startHeight + deltaY)
               };
               break;
-            case 'sw': // Southwest (bottom-left)
+            case 'sw':
               updates = {
                 width: Math.max(20, resizing.startWidth - deltaX),
                 height: Math.max(20, resizing.startHeight + deltaY),
                 x: resizing.startPosX + deltaX
               };
               break;
-            case 'ne': // Northeast (top-right)
+            case 'ne':
               updates = {
                 width: Math.max(20, resizing.startWidth + deltaX),
                 height: Math.max(20, resizing.startHeight - deltaY),
                 y: resizing.startPosY + deltaY
               };
               break;
-            case 'nw': // Northwest (top-left)
+            case 'nw':
               updates = {
                 width: Math.max(20, resizing.startWidth - deltaX),
                 height: Math.max(20, resizing.startHeight - deltaY),
@@ -415,23 +315,23 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
                 y: resizing.startPosY + deltaY
               };
               break;
-            case 'e': // East (right)
+            case 'e':
               updates = {
                 width: Math.max(20, resizing.startWidth + deltaX)
               };
               break;
-            case 'w': // West (left)
+            case 'w':
               updates = {
                 width: Math.max(20, resizing.startWidth - deltaX),
                 x: resizing.startPosX + deltaX
               };
               break;
-            case 's': // South (bottom)
+            case 's':
               updates = {
                 height: Math.max(20, resizing.startHeight + deltaY)
               };
               break;
-            case 'n': // North (top)
+            case 'n':
               updates = {
                 height: Math.max(20, resizing.startHeight - deltaY),
                 y: resizing.startPosY + deltaY
@@ -466,7 +366,6 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
     setComponents(newComponents);
     addToHistory(newComponents);
 
-    // Update selection
     const updated = newComponents.find(c => c.id === id);
     if (updated) {
       onSelectionChange?.(updated);
