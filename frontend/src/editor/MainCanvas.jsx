@@ -12,43 +12,59 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
   const [dragging, setDragging] = useState(null);
   const [resizing, setResizing] = useState(null);
 
-  // FIX: Update components when initialComponents change
+  // FIXED: Update components when initialComponents change (without triggering callback)
+  const initialComponentsRef = useRef(initialComponents);
+  
   useEffect(() => {
-    setComponents(initialComponents);
-    // Only update history if components actually changed
-    if (JSON.stringify(initialComponents) !== JSON.stringify(components)) {
-      setHistory(prev => [...prev, initialComponents]);
-      setHistoryIndex(prev => prev + 1);
+    const prevString = JSON.stringify(initialComponentsRef.current);
+    const newString = JSON.stringify(initialComponents);
+    
+    if (prevString !== newString) {
+      console.log('Updating from initialComponents');
+      initialComponentsRef.current = initialComponents;
+      setComponents(initialComponents);
     }
   }, [initialComponents]);
 
-  // Notify parent of components change
-  useEffect(() => {
+  // FIXED: Only notify parent when components change internally (not from props)
+  const notifyParent = useCallback((newComponents) => {
     if (onComponentsChange) {
-      onComponentsChange(components);
+      // Only notify if components actually changed
+      const currentString = JSON.stringify(components);
+      const newString = JSON.stringify(newComponents);
+      
+      if (currentString !== newString) {
+        onComponentsChange(newComponents);
+      }
     }
-  }, [components, onComponentsChange]);
+  }, [onComponentsChange, components]);
 
   // Add to history
   const addToHistory = useCallback((newComponents) => {
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push(newComponents);
-    setHistory(newHistory);
-    setHistoryIndex(newHistory.length - 1);
+    setHistory(newHistory.slice(-50)); // Keep last 50 states
+    setHistoryIndex(Math.min(newHistory.length - 1, 49));
   }, [history, historyIndex]);
 
   // Undo/Redo
   const handleUndo = () => {
     if (historyIndex > 0) {
-      setHistoryIndex(historyIndex - 1);
-      setComponents(history[historyIndex - 1]);
+      const newIndex = historyIndex - 1;
+      setHistoryIndex(newIndex);
+      const prevComponents = history[newIndex];
+      setComponents(prevComponents);
+      notifyParent(prevComponents);
     }
   };
 
   const handleRedo = () => {
     if (historyIndex < history.length - 1) {
-      setHistoryIndex(historyIndex + 1);
-      setComponents(history[historyIndex + 1]);
+      const newIndex = historyIndex + 1;
+      setHistoryIndex(newIndex);
+      const nextComponents = history[newIndex];
+      setComponents(nextComponents);
+      notifyParent(nextComponents);
     }
   };
 
@@ -85,6 +101,7 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
     addToHistory(newComponents);
     setSelectedId(null);
     onSelectionChange?.(null);
+    notifyParent(newComponents);
   };
 
   const createComponent = useCallback((type, x, y) => {
@@ -186,7 +203,8 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
     addToHistory(newComponents);
     setSelectedId(newComponent.id);
     onSelectionChange?.(newComponent);
-  }, [components, zoom, createComponent, onSelectionChange, addToHistory]);
+    notifyParent(newComponents);
+  }, [components, zoom, createComponent, onSelectionChange, addToHistory, notifyParent]);
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -239,6 +257,7 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
     const handleMouseUp = () => {
       setDragging(null);
       addToHistory(components);
+      notifyParent(components);
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -248,7 +267,7 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [dragging, zoom, components, addToHistory]);
+  }, [dragging, zoom, components, addToHistory, notifyParent]);
 
   // Handle resize
   const handleResizeMouseDown = (e, component, direction) => {
@@ -347,6 +366,7 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
     const handleMouseUp = () => {
       setResizing(null);
       addToHistory(components);
+      notifyParent(components);
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -356,7 +376,7 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [resizing, zoom, components, addToHistory]);
+  }, [resizing, zoom, components, addToHistory, notifyParent]);
 
   // Update component property
   const updateComponent = useCallback((id, updates) => {
@@ -365,12 +385,13 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
     );
     setComponents(newComponents);
     addToHistory(newComponents);
+    notifyParent(newComponents);
 
     const updated = newComponents.find(c => c.id === id);
     if (updated) {
       onSelectionChange?.(updated);
     }
-  }, [components, addToHistory, onSelectionChange]);
+  }, [components, addToHistory, onSelectionChange, notifyParent]);
 
   // Expose update function
   useEffect(() => {

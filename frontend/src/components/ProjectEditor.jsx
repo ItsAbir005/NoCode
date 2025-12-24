@@ -148,9 +148,6 @@ const ProjectEditor = ({ projectId }) => {
     );
   }
 
-  // Debug log
-  console.log('Current components count:', components.length);
-
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       <TopBar
