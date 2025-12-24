@@ -39,9 +39,11 @@ const ProjectEditor = ({ projectId }) => {
   };
 
   const handlePublish = async () => {
+    // Force save before publishing
+    await manualSave();
+    
     const success = await updateProjectMetadata({
-      status: 'active',
-      components
+      status: 'active'
     });
 
     if (success) {
@@ -51,21 +53,29 @@ const ProjectEditor = ({ projectId }) => {
     }
   };
 
-  // FIXED: Handle AI component generation
-  const handleComponentsGenerated = (newComponents) => {
+  // FIXED: Handle AI component generation with immediate save
+  const handleComponentsGenerated = async (newComponents) => {
     console.log('AI generated components:', newComponents);
     
     // Merge with existing components
     const merged = [...components, ...newComponents];
     console.log('Merged components:', merged);
     
-    // Update via the hook which handles saving
+    // Update components
     updateComponents(merged);
     
-    // Show success message
-    setTimeout(() => {
-      alert(`✨ Added ${newComponents.length} component${newComponents.length > 1 ? 's' : ''} to canvas!`);
-    }, 100);
+    // CRITICAL FIX: Force immediate save after AI generation
+    // Wait a tiny bit for state to update, then force save
+    setTimeout(async () => {
+      console.log('Force saving after AI generation...');
+      const saved = await manualSave();
+      
+      if (saved) {
+        alert(`✨ Added ${newComponents.length} component${newComponents.length > 1 ? 's' : ''} to canvas and saved!`);
+      } else {
+        alert(`⚠️ Components added but save failed. Please try saving manually.`);
+      }
+    }, 500);
   };
 
   const SaveStatusIndicator = () => {
@@ -114,6 +124,11 @@ const ProjectEditor = ({ projectId }) => {
       }
       if (e.key === 'Escape' && showPreview) {
         setShowPreview(false);
+      }
+      // Add Ctrl+S to force save
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        manualSave();
       }
     };
 

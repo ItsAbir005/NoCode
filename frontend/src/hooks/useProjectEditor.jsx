@@ -86,22 +86,20 @@ export function useProjectEditor(projectId) {
   const updateComponents = useCallback((newComponents) => {
     setComponents(newComponents);
     setSaveStatus('unsaved');
-
-    // Add to history
     setHistory(prev => {
-      const newHistory = prev.slice(0, historyIndex + 1);
+      const nextIndex = historyIndex + 1;
+      const newHistory = prev.slice(0, nextIndex);
       newHistory.push(newComponents);
-      return newHistory.slice(-50); // Keep last 50 states
+      return newHistory.slice(-50);
     });
-    setHistoryIndex(prev => Math.min(prev + 1, 49));
 
-    // Trigger auto-save with status callback
+    setHistoryIndex(prev => Math.min(prev + 1, 49));
     stateManager.current.autoSave(
       { components: newComponents },
       2000,
       (status) => setSaveStatus(status)
     );
-  }, [historyIndex]);
+  }, []);
 
   // Undo
   const undo = useCallback(() => {
