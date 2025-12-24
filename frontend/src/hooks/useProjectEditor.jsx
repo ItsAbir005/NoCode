@@ -94,12 +94,19 @@ export function useProjectEditor(projectId) {
     });
 
     setHistoryIndex(prev => Math.min(prev + 1, 49));
+
+    // Format data for save
+    const saveData = {
+      pages: JSON.stringify(newComponents),
+      components: JSON.stringify(newComponents)
+    };
+
     stateManager.current.autoSave(
-      { components: newComponents },
+      saveData,
       2000,
       (status) => setSaveStatus(status)
     );
-  }, []);
+  }, [historyIndex]);
 
   // Undo
   const undo = useCallback(() => {
@@ -139,7 +146,10 @@ export function useProjectEditor(projectId) {
   useEffect(() => {
     if (stateManager.current && !loading) {
       stateManager.current.startPeriodicSave(
-        () => ({ components }),
+        () => ({
+          pages: JSON.stringify(components),
+          components: JSON.stringify(components)
+        }),
         30000 // 30 seconds
       );
     }
