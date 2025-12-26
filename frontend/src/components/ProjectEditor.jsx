@@ -7,6 +7,7 @@ import { MainCanvas } from '../editor/MainCanvas';
 import { RightSidebar } from '../editor/RightSidebar';
 import { AIChatPanel } from '../editor/AIChatPanel';
 import { PreviewMode } from './PreviewMode';
+import { PageManager } from './PageManager';
 import { Cloud, CloudOff, AlertCircle, Loader2 } from 'lucide-react';
 
 const ProjectEditor = ({ projectId }) => {
@@ -29,6 +30,7 @@ const ProjectEditor = ({ projectId }) => {
     manualSave,
     updateProjectMetadata,
   } = useProjectEditor(projectId);
+  const [currentPageId, setCurrentPageId] = useState('home');
 
   const handleProjectNameChange = async (newName) => {
     await updateProjectMetadata({ name: newName });
@@ -41,7 +43,7 @@ const ProjectEditor = ({ projectId }) => {
   const handlePublish = async () => {
     // Force save before publishing
     await manualSave();
-    
+
     const success = await updateProjectMetadata({
       status: 'active'
     });
@@ -52,24 +54,19 @@ const ProjectEditor = ({ projectId }) => {
       alert('Failed to publish project');
     }
   };
-
-  // FIXED: Handle AI component generation with immediate save
   const handleComponentsGenerated = async (newComponents) => {
     console.log('AI generated components:', newComponents);
-    
+
     // Merge with existing components
     const merged = [...components, ...newComponents];
     console.log('Merged components:', merged);
-    
+
     // Update components
     updateComponents(merged);
-    
-    // CRITICAL FIX: Force immediate save after AI generation
-    // Wait a tiny bit for state to update, then force save
     setTimeout(async () => {
       console.log('Force saving after AI generation...');
       const saved = await manualSave();
-      
+
       if (saved) {
         alert(`✨ Added ${newComponents.length} component${newComponents.length > 1 ? 's' : ''} to canvas and saved!`);
       } else {
@@ -180,8 +177,18 @@ const ProjectEditor = ({ projectId }) => {
       />
 
       <div className="flex-1 flex overflow-hidden">
-        <div className="w-64 border-r border-gray-200 bg-white">
-          <LeftSidebar />
+        <div className="w-64 border-r border-gray-200 bg-white flex flex-col">
+          <PageManager
+            project={project}
+            onPagesUpdate={async (pages) => {
+              await updateProjectMetadata({ pages: JSON.stringify(pages) });
+            }}
+            currentPageId={currentPageId}
+            onPageChange={setCurrentPageId}
+          />
+          <div className="flex-1 overflow-hidden">
+            <LeftSidebar />
+          </div>
         </div>
 
         <div className="flex-1">

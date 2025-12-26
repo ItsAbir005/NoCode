@@ -10,7 +10,8 @@ export function useProjectEditor(projectId) {
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [selectedComponent, setSelectedComponent] = useState(null);
-
+  const [currentPageComponents, setCurrentPageComponents] = useState([]);
+  const [currentPageId, setCurrentPageId] = useState('home');
   const stateManager = useRef(null);
   const navigate = useNavigate();
 
@@ -25,6 +26,20 @@ export function useProjectEditor(projectId) {
       }
     };
   }, [projectId]);
+  const switchPage = useCallback((pageId) => {
+    // Save current page components first
+    const updatedPages = pages.map(page =>
+      page.id === currentPageId
+        ? { ...page, components: currentPageComponents }
+        : page
+    );
+
+    // Switch to new page
+    const newPage = updatedPages.find(p => p.id === pageId);
+    setCurrentPageId(pageId);
+    setCurrentPageComponents(newPage?.components || []);
+    setPages(updatedPages);
+  }, [currentPageId, currentPageComponents, pages]);
 
   // Load project
   const loadProject = async () => {
@@ -56,6 +71,23 @@ export function useProjectEditor(projectId) {
     }
 
     setLoading(false);
+    let pages = [];
+    if (result.data.pages) {
+      try {
+        pages = typeof result.data.pages === 'string'
+          ? JSON.parse(result.data.pages)
+          : result.data.pages;
+      } catch (e) {
+        pages = [{ id: 'home', name: 'Home', path: '/', components: [] }];
+      }
+    }
+
+    setPages(pages);
+
+    // Load components for the first page
+    const firstPage = pages[0] || { id: 'home', name: 'Home', path: '/', components: [] };
+    setCurrentPageId(firstPage.id);
+    setCurrentPageComponents(firstPage.components || []);
   };
 
   // Save project
