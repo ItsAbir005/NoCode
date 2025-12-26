@@ -2,10 +2,8 @@
 import { useState } from 'react';
 import { Plus, Trash2, Edit2, Check, X, FileText, Home, Settings as SettingsIcon } from 'lucide-react';
 
-export function PageManager({ project, onPagesUpdate, currentPageId, onPageChange }) {
-  const [pages, setPages] = useState(project.pages || [
-    { id: 'home', name: 'Home', path: '/', components: [] }
-  ]);
+export function PageManager({ project, pages = [], onPagesUpdate, currentPageId, onPageChange }) {
+  // Removed local pages state to rely on props
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState('');
 
@@ -17,7 +15,6 @@ export function PageManager({ project, onPagesUpdate, currentPageId, onPageChang
       components: []
     };
     const updated = [...pages, newPage];
-    setPages(updated);
     onPagesUpdate(updated);
     onPageChange(newPage.id);
   };
@@ -29,7 +26,6 @@ export function PageManager({ project, onPagesUpdate, currentPageId, onPageChang
     }
     if (confirm('Are you sure you want to delete this page?')) {
       const updated = pages.filter(p => p.id !== pageId);
-      setPages(updated);
       onPagesUpdate(updated);
       if (currentPageId === pageId) {
         onPageChange(updated[0].id);
@@ -46,7 +42,6 @@ export function PageManager({ project, onPagesUpdate, currentPageId, onPageChang
     const updated = pages.map(p =>
       p.id === pageId ? { ...p, name: editName } : p
     );
-    setPages(updated);
     onPagesUpdate(updated);
     setEditingId(null);
   };
@@ -57,6 +52,7 @@ export function PageManager({ project, onPagesUpdate, currentPageId, onPageChang
   };
 
   const getIcon = (page) => {
+    if (!page.path) return FileText;
     if (page.path === '/') return Home;
     if (page.path.includes('settings')) return SettingsIcon;
     return FileText;
@@ -77,7 +73,7 @@ export function PageManager({ project, onPagesUpdate, currentPageId, onPageChang
         </button>
       </div>
 
-      <div className="space-y-1">
+      <div className="space-y-1 max-h-64 overflow-y-auto">
         {pages.map((page) => {
           const Icon = getIcon(page);
           const isActive = currentPageId === page.id;
@@ -86,14 +82,13 @@ export function PageManager({ project, onPagesUpdate, currentPageId, onPageChang
           return (
             <div
               key={page.id}
-              className={`flex items-center gap-2 px-2 py-2 rounded text-sm ${
-                isActive
-                  ? 'bg-indigo-50 text-indigo-700'
-                  : 'text-gray-700 hover:bg-gray-50'
-              }`}
+              className={`flex items-center gap-2 px-2 py-2 rounded text-sm ${isActive
+                ? 'bg-indigo-50 text-indigo-700'
+                : 'text-gray-700 hover:bg-gray-50'
+                }`}
             >
               <Icon className="w-4 h-4 flex-shrink-0" />
-              
+
               {isEditing ? (
                 <>
                   <input

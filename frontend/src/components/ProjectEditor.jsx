@@ -29,8 +29,11 @@ const ProjectEditor = ({ projectId }) => {
     redo,
     manualSave,
     updateProjectMetadata,
+    switchPage, // Destructure switchPage
+    currentPageId, // Destructure currentPageId
+    pages, // Destructure pages directly from hook if needed
   } = useProjectEditor(projectId);
-  const [currentPageId, setCurrentPageId] = useState('home');
+  // Removed local currentPageId state
 
   const handleProjectNameChange = async (newName) => {
     await updateProjectMetadata({ name: newName });
@@ -180,11 +183,16 @@ const ProjectEditor = ({ projectId }) => {
         <div className="w-64 border-r border-gray-200 bg-white flex flex-col">
           <PageManager
             project={project}
-            onPagesUpdate={async (pages) => {
-              await updateProjectMetadata({ pages: JSON.stringify(pages) });
+            pages={pages} // Pass pages from hook + project.pages might be stale if we don't update project object often enough,
+            // but useProjectEditor updates project on save. 
+            // Better to rely on the hook's returned 'pages' if we exported it, or project.pages.
+            // For now, project.pages should be up to date via updateProjectMetadata.
+            onPagesUpdate={async (newPages) => {
+              // When adding/deleting pages, we want to save AND update local state.
+              await updateProjectMetadata({ pages: JSON.stringify(newPages) });
             }}
             currentPageId={currentPageId}
-            onPageChange={setCurrentPageId}
+            onPageChange={switchPage} // Use switchPage instead of setCurrentPageId
           />
           <div className="flex-1 overflow-hidden">
             <LeftSidebar />
@@ -220,14 +228,16 @@ const ProjectEditor = ({ projectId }) => {
         onComponentsGenerated={handleComponentsGenerated}
       />
 
-      {showPreview && (
-        <PreviewMode
-          components={components}
-          projectName={project.name}
-          onClose={() => setShowPreview(false)}
-        />
-      )}
-    </div>
+      {
+        showPreview && (
+          <PreviewMode
+            components={components}
+            projectName={project.name}
+            onClose={() => setShowPreview(false)}
+          />
+        )
+      }
+    </div >
   );
 };
 

@@ -14,6 +14,7 @@ export function useProjectEditor(projectId) {
   const [currentPageId, setCurrentPageId] = useState('home');
   const stateManager = useRef(null);
   const navigate = useNavigate();
+  const [pages, setPages] = useState([]);
 
   // Initialize state manager
   useEffect(() => {
@@ -27,19 +28,39 @@ export function useProjectEditor(projectId) {
     };
   }, [projectId]);
   const switchPage = useCallback((pageId) => {
-    // Save current page components first
+    console.log('Switching to page:', pageId);
+    // 1. Save current page components to the pages array
     const updatedPages = pages.map(page =>
       page.id === currentPageId
-        ? { ...page, components: currentPageComponents }
+        ? { ...page, components: components }
         : page
     );
 
-    // Switch to new page
+    // 2. Find new page
     const newPage = updatedPages.find(p => p.id === pageId);
-    setCurrentPageId(pageId);
-    setCurrentPageComponents(newPage?.components || []);
+    if (!newPage) {
+      console.error(`Page not found: ${pageId}`);
+      return;
+    }
+
+    console.log('Found new page:', newPage);
+
+
+    // 3. Update state
     setPages(updatedPages);
-  }, [currentPageId, currentPageComponents, pages]);
+    setCurrentPageId(pageId);
+    setComponents(newPage.components || []);
+
+    // 4. Reset history for the new page
+    setHistory([newPage.components || []]);
+    setHistoryIndex(0);
+    setSaveStatus('saved');
+
+    // 5. Trigger auto-save to persist the switch (optional, but good for syncing)
+    // We don't save to backend immediately on simple switch to avoid lag, 
+    // but we ensure 'pages' state is correct for the next save.
+  }, [currentPageId, components, pages]);
+
 
   // Load project
   const loadProject = async () => {
@@ -47,22 +68,42 @@ export function useProjectEditor(projectId) {
     const result = await stateManager.current.loadProject();
 
     if (result.success) {
-      setProject(result.data);
-
-      // Parse components
-      let loadedComponents = [];
-      if (result.data.pages) {
-        try {
-          loadedComponents = typeof result.data.pages === 'string'
+      let loadedPages = [];
+      try {
+        // Handle both string and array formats for pages
+        if (result.data.pages) {
+          loadedPages = typeof result.data.pages === 'string'
             ? JSON.parse(result.data.pages)
             : result.data.pages;
-        } catch (e) {
-          console.error('Error parsing components:', e);
         }
+
+        // Ensure loadedPages is an array
+        if (!Array.isArray(loadedPages) || loadedPages.length === 0) {
+          loadedPages = [{ id: 'home', name: 'Home', path: '/', components: [] }];
+        }
+
+        // Sanitize pages: ensure every page has a path
+        loadedPages = loadedPages.map((page, index) => ({
+          ...page,
+          path: page.path || (page.id === 'home' ? '/' : `/page-${index + 1}`),
+          components: page.components || []
+        }));
+      } catch (e) {
+        console.error('Error parsing pages:', e);
+        loadedPages = [{ id: 'home', name: 'Home', path: '/', components: [] }];
       }
 
-      setComponents(Array.isArray(loadedComponents) ? loadedComponents : []);
-      setHistory([loadedComponents]);
+      // Update project with parsed pages to ensure views get array
+      setProject({ ...result.data, pages: loadedPages });
+      setPages(loadedPages);
+
+      // Initialize state from first page
+      const firstPage = loadedPages[0];
+      setCurrentPageId(firstPage.id);
+      setCurrentPageComponents(firstPage.components || []);
+      setComponents(firstPage.components || []);
+
+      setHistory([firstPage.components || []]);
       setHistoryIndex(0);
       setSaveStatus('saved');
     } else {
@@ -71,33 +112,36 @@ export function useProjectEditor(projectId) {
     }
 
     setLoading(false);
-    let pages = [];
-    if (result.data.pages) {
-      try {
-        pages = typeof result.data.pages === 'string'
-          ? JSON.parse(result.data.pages)
-          : result.data.pages;
-      } catch (e) {
-        pages = [{ id: 'home', name: 'Home', path: '/', components: [] }];
-      }
-    }
-
-    setPages(pages);
-
-    // Load components for the first page
-    const firstPage = pages[0] || { id: 'home', name: 'Home', path: '/', components: [] };
-    setCurrentPageId(firstPage.id);
-    setCurrentPageComponents(firstPage.components || []);
   };
 
   // Save project
   const saveProject = useCallback(async (data) => {
     setSaveStatus('saving');
 
+    // Get latest state
+    const currentComponents = data.components || components;
+    let finalPages = pages;
+
+    // Check if we are updating the pages structure directly
+    if (data.pages) {
+      try {
+        finalPages = typeof data.pages === 'string'
+          ? JSON.parse(data.pages)
+          : data.pages;
+      } catch (e) {
+        console.error("Error parsing provided pages:", e);
+      }
+    } else {
+      // Otherwise, assume we are just updating components on the current page
+      finalPages = pages.map(p =>
+        p.id === currentPageId ? { ...p, components: currentComponents } : p
+      );
+    }
+
     const saveData = {
-      pages: JSON.stringify(data.components || components),
-      components: JSON.stringify(data.components || components),
-      ...data
+      ...data,
+      pages: JSON.stringify(finalPages),
+      components: JSON.stringify(currentComponents)
     };
 
     const result = await stateManager.current.saveProject(saveData);
@@ -105,14 +149,23 @@ export function useProjectEditor(projectId) {
     if (result.success) {
       setSaveStatus('saved');
       if (result.data) {
-        setProject(prev => ({ ...prev, ...result.data }));
+        setProject(prev => ({
+          ...prev,
+          ...result.data,
+          pages: finalPages
+        }));
+
+        // If we updated pages structure from outside (e.g. PageManager), sync local state
+        if (data.pages) {
+          setPages(finalPages);
+        }
       }
       return true;
     } else {
       setSaveStatus('error');
       return false;
     }
-  }, [components]);
+  }, [components, pages, currentPageId]);
 
   // Update components with auto-save
   const updateComponents = useCallback((newComponents) => {
@@ -127,9 +180,15 @@ export function useProjectEditor(projectId) {
 
     setHistoryIndex(prev => Math.min(prev + 1, 49));
 
+    // Update pages state
+    const updatedPages = pages.map(p =>
+      p.id === currentPageId ? { ...p, components: newComponents } : p
+    );
+    setPages(updatedPages);
+
     // Format data for save
     const saveData = {
-      pages: JSON.stringify(newComponents),
+      pages: JSON.stringify(updatedPages),
       components: JSON.stringify(newComponents)
     };
 
@@ -138,7 +197,7 @@ export function useProjectEditor(projectId) {
       2000,
       (status) => setSaveStatus(status)
     );
-  }, [historyIndex]);
+  }, [historyIndex, pages, currentPageId]);
 
   // Undo
   const undo = useCallback(() => {
@@ -178,14 +237,19 @@ export function useProjectEditor(projectId) {
   useEffect(() => {
     if (stateManager.current && !loading) {
       stateManager.current.startPeriodicSave(
-        () => ({
-          pages: JSON.stringify(components),
-          components: JSON.stringify(components)
-        }),
+        () => {
+          const updatedPages = pages.map(p =>
+            p.id === currentPageId ? { ...p, components: components } : p
+          );
+          return {
+            pages: JSON.stringify(updatedPages),
+            components: JSON.stringify(components)
+          };
+        },
         30000 // 30 seconds
       );
     }
-  }, [components, loading]);
+  }, [components, loading, pages, currentPageId]);
 
   // Warn before leaving with unsaved changes
   useEffect(() => {
@@ -203,6 +267,7 @@ export function useProjectEditor(projectId) {
   return {
     // State
     project,
+    pages,
     components,
     loading,
     saveStatus,
@@ -214,6 +279,7 @@ export function useProjectEditor(projectId) {
     // Actions
     updateComponents,
     setSelectedComponent,
+    switchPage, // Exported
     undo,
     redo,
     manualSave,
