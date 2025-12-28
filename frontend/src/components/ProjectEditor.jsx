@@ -13,7 +13,10 @@ import { Cloud, CloudOff, AlertCircle, Loader2 } from 'lucide-react';
 const ProjectEditor = ({ projectId }) => {
   const [isAIOpen, setIsAIOpen] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [leftSidebarWidth, setLeftSidebarWidth] = useState(256);
+  const [isResizing, setIsResizing] = useState(false);
   const navigate = useNavigate();
+  
   const {
     project,
     components,
@@ -29,11 +32,10 @@ const ProjectEditor = ({ projectId }) => {
     redo,
     manualSave,
     updateProjectMetadata,
-    switchPage, // Destructure switchPage
-    currentPageId, // Destructure currentPageId
-    pages, // Destructure pages directly from hook if needed
+    switchPage,
+    currentPageId,
+    pages,
   } = useProjectEditor(projectId);
-  // Removed local currentPageId state
 
   const handleProjectNameChange = async (newName) => {
     await updateProjectMetadata({ name: newName });
@@ -44,7 +46,6 @@ const ProjectEditor = ({ projectId }) => {
   };
 
   const handlePublish = async () => {
-    // Force save before publishing
     await manualSave();
 
     const success = await updateProjectMetadata({
@@ -57,15 +58,13 @@ const ProjectEditor = ({ projectId }) => {
       alert('Failed to publish project');
     }
   };
+
   const handleComponentsGenerated = async (newComponents) => {
     console.log('AI generated components:', newComponents);
-
-    // Merge with existing components
     const merged = [...components, ...newComponents];
     console.log('Merged components:', merged);
-
-    // Update components
     updateComponents(merged);
+    
     setTimeout(async () => {
       console.log('Force saving after AI generation...');
       const saved = await manualSave();
@@ -125,7 +124,6 @@ const ProjectEditor = ({ projectId }) => {
       if (e.key === 'Escape' && showPreview) {
         setShowPreview(false);
       }
-      // Add Ctrl+S to force save
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
         manualSave();
@@ -135,6 +133,28 @@ const ProjectEditor = ({ projectId }) => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showPreview]);
+
+  // Handle resize
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e) => {
+      const newWidth = Math.max(200, Math.min(500, e.clientX));
+      setLeftSidebarWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing]);
 
   if (loading) {
     return (
@@ -180,23 +200,32 @@ const ProjectEditor = ({ projectId }) => {
       />
 
       <div className="flex-1 flex overflow-hidden">
-        <div className="w-64 border-r border-gray-200 bg-white flex flex-col">
+        <div 
+          className="border-r border-gray-200 bg-white flex flex-col relative"
+          style={{ width: `${leftSidebarWidth}px` }}
+        >
           <PageManager
             project={project}
-            pages={pages} // Pass pages from hook + project.pages might be stale if we don't update project object often enough,
-            // but useProjectEditor updates project on save. 
-            // Better to rely on the hook's returned 'pages' if we exported it, or project.pages.
-            // For now, project.pages should be up to date via updateProjectMetadata.
+            pages={pages}
             onPagesUpdate={async (newPages) => {
-              // When adding/deleting pages, we want to save AND update local state.
               await updateProjectMetadata({ pages: JSON.stringify(newPages) });
             }}
             currentPageId={currentPageId}
-            onPageChange={switchPage} // Use switchPage instead of setCurrentPageId
+            onPageChange={switchPage}
           />
           <div className="flex-1 overflow-hidden">
             <LeftSidebar />
           </div>
+          
+          {/* Resize Handle */}
+          <div
+            className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-indigo-500 bg-gray-300 transition-colors"
+            onMouseDown={() => setIsResizing(true)}
+            style={{ 
+              width: '4px',
+              zIndex: 10
+            }}
+          />
         </div>
 
         <div className="flex-1">
@@ -228,16 +257,14 @@ const ProjectEditor = ({ projectId }) => {
         onComponentsGenerated={handleComponentsGenerated}
       />
 
-      {
-        showPreview && (
-          <PreviewMode
-            components={components}
-            projectName={project.name}
-            onClose={() => setShowPreview(false)}
-          />
-        )
-      }
-    </div >
+      {showPreview && (
+        <PreviewMode
+          components={components}
+          projectName={project.name}
+          onClose={() => setShowPreview(false)}
+        />
+      )}
+    </div>
   );
 };
 

@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { Plus, Trash2, Edit2, Check, X, FileText, Home, Settings as SettingsIcon } from 'lucide-react';
 
 export function PageManager({ project, pages = [], onPagesUpdate, currentPageId, onPageChange }) {
-  // Removed local pages state to rely on props
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState('');
 
@@ -16,7 +15,8 @@ export function PageManager({ project, pages = [], onPagesUpdate, currentPageId,
     };
     const updated = [...pages, newPage];
     onPagesUpdate(updated);
-    onPageChange(newPage.id);
+    // Automatically switch to the new page
+    setTimeout(() => onPageChange(newPage.id), 100);
   };
 
   const handleDeletePage = (pageId) => {
@@ -66,10 +66,10 @@ export function PageManager({ project, pages = [], onPagesUpdate, currentPageId,
         </h3>
         <button
           onClick={handleAddPage}
-          className="p-1.5 hover:bg-gray-100 rounded transition-colors"
+          className="p-1.5 hover:bg-indigo-50 hover:text-indigo-600 rounded transition-colors"
           title="Add new page"
         >
-          <Plus className="w-4 h-4 text-gray-600" />
+          <Plus className="w-4 h-4" />
         </button>
       </div>
 
@@ -82,12 +82,14 @@ export function PageManager({ project, pages = [], onPagesUpdate, currentPageId,
           return (
             <div
               key={page.id}
-              className={`flex items-center gap-2 px-2 py-2 rounded text-sm ${isActive
-                ? 'bg-indigo-50 text-indigo-700'
-                : 'text-gray-700 hover:bg-gray-50'
-                }`}
+              className={`flex items-center gap-2 px-2 py-2 rounded text-sm group transition-all cursor-pointer ${
+                isActive
+                  ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-sm'
+                  : 'text-gray-700 hover:bg-gray-50 border border-transparent hover:border-gray-200'
+              }`}
+              onClick={() => !isEditing && onPageChange(page.id)}
             >
-              <Icon className="w-4 h-4 flex-shrink-0" />
+              <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-indigo-600' : 'text-gray-500'}`} />
 
               {isEditing ? (
                 <>
@@ -99,45 +101,68 @@ export function PageManager({ project, pages = [], onPagesUpdate, currentPageId,
                       if (e.key === 'Enter') handleSaveEdit(page.id);
                       if (e.key === 'Escape') handleCancelEdit();
                     }}
-                    className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="flex-1 px-2 py-1 text-sm border border-indigo-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                     autoFocus
+                    onClick={(e) => e.stopPropagation()}
                   />
                   <button
-                    onClick={() => handleSaveEdit(page.id)}
-                    className="p-1 hover:bg-green-100 rounded"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSaveEdit(page.id);
+                    }}
+                    className="p-1 hover:bg-green-100 rounded transition-colors"
+                    title="Save"
                   >
                     <Check className="w-3.5 h-3.5 text-green-600" />
                   </button>
                   <button
-                    onClick={handleCancelEdit}
-                    className="p-1 hover:bg-red-100 rounded"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCancelEdit();
+                    }}
+                    className="p-1 hover:bg-red-100 rounded transition-colors"
+                    title="Cancel"
                   >
                     <X className="w-3.5 h-3.5 text-red-600" />
                   </button>
                 </>
               ) : (
                 <>
-                  <button
-                    onClick={() => onPageChange(page.id)}
-                    className="flex-1 text-left"
-                  >
-                    <span className="font-medium">{page.name}</span>
-                    <span className="text-xs text-gray-500 ml-2">{page.path}</span>
-                  </button>
-                  <button
-                    onClick={() => handleStartEdit(page)}
-                    className="p-1 opacity-0 group-hover:opacity-100 hover:bg-gray-200 rounded"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                  </button>
-                  {pages.length > 1 && (
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className={`font-medium block truncate ${isActive ? 'text-indigo-700' : 'text-gray-900'}`}>
+                        {page.name}
+                      </span>
+                      {isActive && (
+                        <span className="flex-shrink-0 w-1.5 h-1.5 bg-indigo-600 rounded-full"></span>
+                      )}
+                    </div>
+                    <span className="text-xs text-gray-500 block truncate">{page.path}</span>
+                  </div>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
-                      onClick={() => handleDeletePage(page.id)}
-                      className="p-1 opacity-0 group-hover:opacity-100 hover:bg-red-100 rounded"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleStartEdit(page);
+                      }}
+                      className="p-1 hover:bg-indigo-100 rounded transition-colors"
+                      title="Rename page"
                     >
-                      <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                      <Edit2 className="w-3.5 h-3.5 text-gray-600" />
                     </button>
-                  )}
+                    {pages.length > 1 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeletePage(page.id);
+                        }}
+                        className="p-1 hover:bg-red-100 rounded transition-colors"
+                        title="Delete page"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                      </button>
+                    )}
+                  </div>
                 </>
               )}
             </div>
@@ -146,8 +171,14 @@ export function PageManager({ project, pages = [], onPagesUpdate, currentPageId,
       </div>
 
       <div className="mt-3 pt-3 border-t border-gray-200">
-        <div className="text-xs text-gray-500">
-          {pages.length} page{pages.length !== 1 ? 's' : ''}
+        <div className="flex items-center justify-between text-xs text-gray-500">
+          <span>{pages.length} page{pages.length !== 1 ? 's' : ''}</span>
+          {currentPageId && (
+            <span className="flex items-center gap-1.5">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span className="text-green-600 font-medium">Active</span>
+            </span>
+          )}
         </div>
       </div>
     </div>

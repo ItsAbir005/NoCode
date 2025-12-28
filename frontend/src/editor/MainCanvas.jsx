@@ -13,22 +13,21 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
   const [resizing, setResizing] = useState(null);
   const initialComponentsRef = useRef(initialComponents);
   const componentsRef = useRef(components);
+
   useEffect(() => {
     componentsRef.current = components;
   }, [components]);
 
-
+  // Only initialize components once on mount
   useEffect(() => {
-    const prevString = JSON.stringify(initialComponentsRef.current);
-    const newString = JSON.stringify(initialComponents);
-
-    if (prevString !== newString) {
-      console.log('Updating from initialComponents');
+    if (initialComponents.length > 0 && components.length === 0) {
       initialComponentsRef.current = initialComponents;
       setComponents(initialComponents);
+      setHistory([initialComponents]);
+      setHistoryIndex(0);
     }
-  }, [initialComponents]);
-  // Notify parent of component changes
+  }, []);
+
   const onComponentsChangeRef = useRef(onComponentsChange);
   useEffect(() => {
     onComponentsChangeRef.current = onComponentsChange;
@@ -38,15 +37,13 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
     onComponentsChangeRef.current?.(newComponents);
   }, []);
 
-  // Add to history
   const addToHistory = useCallback((newComponents) => {
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push(newComponents);
-    setHistory(newHistory.slice(-50)); // Keep last 50 states
+    setHistory(newHistory.slice(-50));
     setHistoryIndex(Math.min(newHistory.length - 1, 49));
   }, [history, historyIndex]);
 
-  // Undo/Redo
   const handleUndo = () => {
     if (historyIndex > 0) {
       const newIndex = historyIndex - 1;
@@ -67,7 +64,6 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
     }
   };
 
-  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
@@ -210,7 +206,6 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
     e.dataTransfer.dropEffect = "copy";
   };
 
-  // Component dragging
   const handleComponentMouseDown = (e, component) => {
     if (e.button !== 0) return;
     e.stopPropagation();
@@ -232,7 +227,6 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
     });
   };
 
-  // Handle mouse move for dragging
   useEffect(() => {
     if (!dragging) return;
 
@@ -255,7 +249,6 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
 
     const handleMouseUp = () => {
       setDragging(null);
-      // Use the latest state to notify parent
       setComponents(latest => {
         notifyParent(latest);
         return latest;
@@ -268,9 +261,8 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [dragging, zoom, notifyParent]); // Stable dependencies
+  }, [dragging, zoom, notifyParent]);
 
-  // Handle resize
   const handleResizeMouseDown = (e, component, direction) => {
     e.stopPropagation();
 
@@ -292,6 +284,7 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
       startPosY
     });
   };
+
   useEffect(() => {
     if (!resizing) return;
 
@@ -302,7 +295,46 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
       setComponents(prev =>
         prev.map(c => {
           if (c.id !== resizing.id) return c;
-          // ... (Keep your existing switch statement logic here)
+
+          const updates = {};
+
+          switch (resizing.direction) {
+            case 'nw':
+              updates.width = Math.max(20, resizing.startWidth - deltaX);
+              updates.height = Math.max(20, resizing.startHeight - deltaY);
+              updates.x = resizing.startPosX + deltaX;
+              updates.y = resizing.startPosY + deltaY;
+              break;
+            case 'n':
+              updates.height = Math.max(20, resizing.startHeight - deltaY);
+              updates.y = resizing.startPosY + deltaY;
+              break;
+            case 'ne':
+              updates.width = Math.max(20, resizing.startWidth + deltaX);
+              updates.height = Math.max(20, resizing.startHeight - deltaY);
+              updates.y = resizing.startPosY + deltaY;
+              break;
+            case 'e':
+              updates.width = Math.max(20, resizing.startWidth + deltaX);
+              break;
+            case 'se':
+              updates.width = Math.max(20, resizing.startWidth + deltaX);
+              updates.height = Math.max(20, resizing.startHeight + deltaY);
+              break;
+            case 's':
+              updates.height = Math.max(20, resizing.startHeight + deltaY);
+              break;
+            case 'sw':
+              updates.width = Math.max(20, resizing.startWidth - deltaX);
+              updates.height = Math.max(20, resizing.startHeight + deltaY);
+              updates.x = resizing.startPosX + deltaX;
+              break;
+            case 'w':
+              updates.width = Math.max(20, resizing.startWidth - deltaX);
+              updates.x = resizing.startPosX + deltaX;
+              break;
+          }
+
           return { ...c, ...updates };
         })
       );
@@ -324,7 +356,6 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
     };
   }, [resizing, zoom, notifyParent]);
 
-  // Update component property
   const updateComponent = useCallback((id, updates) => {
     const newComponents = components.map(c =>
       c.id === id ? { ...c, ...updates } : c
@@ -339,7 +370,6 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
     }
   }, [components, addToHistory, onSelectionChange, notifyParent]);
 
-  // Expose update function
   useEffect(() => {
     window.__updateComponent = updateComponent;
   }, [updateComponent]);
