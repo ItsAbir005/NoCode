@@ -19,7 +19,8 @@ export function PageManager({ project, pages = [], onPagesUpdate, currentPageId,
     setTimeout(() => onPageChange(newPage.id), 100);
   };
 
-  const handleDeletePage = (pageId) => {
+  const handleDeletePage = (e, pageId) => {
+    e.stopPropagation();
     if (pages.length === 1) {
       alert('Cannot delete the last page');
       return;
@@ -33,12 +34,14 @@ export function PageManager({ project, pages = [], onPagesUpdate, currentPageId,
     }
   };
 
-  const handleStartEdit = (page) => {
+  const handleStartEdit = (e, page) => {
+    e.stopPropagation();
     setEditingId(page.id);
     setEditName(page.name);
   };
 
-  const handleSaveEdit = (pageId) => {
+  const handleSaveEdit = (e, pageId) => {
+    e.stopPropagation();
     const updated = pages.map(p =>
       p.id === pageId ? { ...p, name: editName } : p
     );
@@ -46,9 +49,16 @@ export function PageManager({ project, pages = [], onPagesUpdate, currentPageId,
     setEditingId(null);
   };
 
-  const handleCancelEdit = () => {
+  const handleCancelEdit = (e) => {
+    e.stopPropagation();
     setEditingId(null);
     setEditName('');
+  };
+
+  const handlePageClick = (pageId) => {
+    if (editingId === null) {
+      onPageChange(pageId);
+    }
   };
 
   const getIcon = (page) => {
@@ -82,12 +92,12 @@ export function PageManager({ project, pages = [], onPagesUpdate, currentPageId,
           return (
             <div
               key={page.id}
-              className={`flex items-center gap-2 px-2 py-2 rounded text-sm group transition-all cursor-pointer ${
+              className={`flex items-center gap-2 px-2 py-2 rounded text-sm group transition-all ${
                 isActive
                   ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-sm'
                   : 'text-gray-700 hover:bg-gray-50 border border-transparent hover:border-gray-200'
-              }`}
-              onClick={() => !isEditing && onPageChange(page.id)}
+              } ${!isEditing ? 'cursor-pointer' : ''}`}
+              onClick={() => handlePageClick(page.id)}
             >
               <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-indigo-600' : 'text-gray-500'}`} />
 
@@ -98,28 +108,22 @@ export function PageManager({ project, pages = [], onPagesUpdate, currentPageId,
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleSaveEdit(page.id);
-                      if (e.key === 'Escape') handleCancelEdit();
+                      if (e.key === 'Enter') handleSaveEdit(e, page.id);
+                      if (e.key === 'Escape') handleCancelEdit(e);
                     }}
                     className="flex-1 px-2 py-1 text-sm border border-indigo-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                     autoFocus
                     onClick={(e) => e.stopPropagation()}
                   />
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleSaveEdit(page.id);
-                    }}
+                    onClick={(e) => handleSaveEdit(e, page.id)}
                     className="p-1 hover:bg-green-100 rounded transition-colors"
                     title="Save"
                   >
                     <Check className="w-3.5 h-3.5 text-green-600" />
                   </button>
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleCancelEdit();
-                    }}
+                    onClick={(e) => handleCancelEdit(e)}
                     className="p-1 hover:bg-red-100 rounded transition-colors"
                     title="Cancel"
                   >
@@ -141,10 +145,7 @@ export function PageManager({ project, pages = [], onPagesUpdate, currentPageId,
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleStartEdit(page);
-                      }}
+                      onClick={(e) => handleStartEdit(e, page)}
                       className="p-1 hover:bg-indigo-100 rounded transition-colors"
                       title="Rename page"
                     >
@@ -152,10 +153,7 @@ export function PageManager({ project, pages = [], onPagesUpdate, currentPageId,
                     </button>
                     {pages.length > 1 && (
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeletePage(page.id);
-                        }}
+                        onClick={(e) => handleDeletePage(e, page.id)}
                         className="p-1 hover:bg-red-100 rounded transition-colors"
                         title="Delete page"
                       >

@@ -5,44 +5,46 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const [zoom, setZoom] = useState(100);
-  const [components, setComponents] = useState(initialComponents);
+  const [components, setComponents] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
-  const [history, setHistory] = useState([initialComponents]);
+  const [history, setHistory] = useState([[]]);
   const [historyIndex, setHistoryIndex] = useState(0);
   const [dragging, setDragging] = useState(null);
   const [resizing, setResizing] = useState(null);
-  const initialComponentsRef = useRef(initialComponents);
-  const componentsRef = useRef(components);
+  const isInitialized = useRef(false);
+  const prevInitialComponents = useRef([]);
 
+  // Initialize components from props ONCE or when they actually change
   useEffect(() => {
-    componentsRef.current = components;
-  }, [components]);
+    // Only update if initialComponents actually changed (deep comparison of length and IDs)
+    const hasChanged = 
+      initialComponents.length !== prevInitialComponents.current.length ||
+      JSON.stringify(initialComponents.map(c => c.id)) !== JSON.stringify(prevInitialComponents.current.map(c => c.id));
 
-  // Only initialize components once on mount
-  useEffect(() => {
-    if (initialComponents.length > 0 && components.length === 0) {
-      initialComponentsRef.current = initialComponents;
+    if (hasChanged && initialComponents.length > 0) {
+      console.log('MainCanvas initializing with components:', initialComponents);
       setComponents(initialComponents);
       setHistory([initialComponents]);
       setHistoryIndex(0);
+      prevInitialComponents.current = initialComponents;
+      isInitialized.current = true;
+    } else if (!isInitialized.current && initialComponents.length === 0) {
+      // First mount with empty components
+      setComponents([]);
+      setHistory([[]]);
+      setHistoryIndex(0);
+      isInitialized.current = true;
     }
-  }, []);
-
-  const onComponentsChangeRef = useRef(onComponentsChange);
-  useEffect(() => {
-    onComponentsChangeRef.current = onComponentsChange;
-  }, [onComponentsChange]);
-
-  const notifyParent = useCallback((newComponents) => {
-    onComponentsChangeRef.current?.(newComponents);
-  }, []);
+  }, [initialComponents]);
 
   const addToHistory = useCallback((newComponents) => {
-    const newHistory = history.slice(0, historyIndex + 1);
-    newHistory.push(newComponents);
-    setHistory(newHistory.slice(-50));
-    setHistoryIndex(Math.min(newHistory.length - 1, 49));
-  }, [history, historyIndex]);
+    setHistory(prev => {
+      const newHistory = prev.slice(0, historyIndex + 1);
+      newHistory.push(newComponents);
+      return newHistory.slice(-50);
+    });
+    setHistoryIndex(prev => Math.min(prev + 1, 49));
+  }, [historyIndex]);
 
   const handleUndo = () => {
     if (historyIndex > 0) {
@@ -50,7 +52,7 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
       setHistoryIndex(newIndex);
       const prevComponents = history[newIndex];
       setComponents(prevComponents);
-      notifyParent(prevComponents);
+      if (onComponentsChange) onComponentsChange(prevComponents);
     }
   };
 
@@ -60,7 +62,7 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
       setHistoryIndex(newIndex);
       const nextComponents = history[newIndex];
       setComponents(nextComponents);
-      notifyParent(nextComponents);
+      if (onComponentsChange) onComponentsChange(nextComponents);
     }
   };
 
@@ -82,7 +84,7 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedId, historyIndex]);
+  }, [selectedId, historyIndex, history]);
 
   const handleZoom = (direction) => {
     const newZoom = direction === "in" ? Math.min(zoom + 10, 200) : Math.max(zoom - 10, 50);
@@ -95,8 +97,8 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
     setComponents(newComponents);
     addToHistory(newComponents);
     setSelectedId(null);
-    onSelectionChange?.(null);
-    notifyParent(newComponents);
+    if (onSelectionChange) onSelectionChange(null);
+    if (onComponentsChange) onComponentsChange(newComponents);
   };
 
   const createComponent = useCallback((type, x, y) => {
@@ -173,7 +175,7 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
     };
 
     return {
-      id: `${type.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`,
+      id: `${type.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       type,
       x,
       y,
@@ -193,13 +195,16 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
     const y = (e.clientY - rect.top) / (zoom / 100);
 
     const newComponent = createComponent(type, x, y);
-    const newComponents = [...components, newComponent];
-    setComponents(newComponents);
-    addToHistory(newComponents);
+    setComponents(prev => {
+      const newComponents = [...prev, newComponent];
+      addToHistory(newComponents);
+      if (onComponentsChange) onComponentsChange(newComponents);
+      return newComponents;
+    });
+    
     setSelectedId(newComponent.id);
-    onSelectionChange?.(newComponent);
-    notifyParent(newComponents);
-  }, [components, zoom, createComponent, onSelectionChange, addToHistory, notifyParent]);
+    if (onSelectionChange) onSelectionChange(newComponent);
+  }, [zoom, createComponent, onSelectionChange, addToHistory, onComponentsChange]);
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -211,7 +216,7 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
     e.stopPropagation();
 
     setSelectedId(component.id);
-    onSelectionChange?.(component);
+    if (onSelectionChange) onSelectionChange(component);
 
     const startX = e.clientX;
     const startY = e.clientY;
@@ -249,10 +254,9 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
 
     const handleMouseUp = () => {
       setDragging(null);
-      setComponents(latest => {
-        notifyParent(latest);
-        return latest;
-      });
+      if (onComponentsChange) {
+        onComponentsChange(components);
+      }
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -261,7 +265,7 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [dragging, zoom, notifyParent]);
+  }, [dragging, zoom, onComponentsChange]);
 
   const handleResizeMouseDown = (e, component, direction) => {
     e.stopPropagation();
@@ -342,10 +346,9 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
 
     const handleMouseUp = () => {
       setResizing(null);
-      setComponents(latest => {
-        notifyParent(latest);
-        return latest;
-      });
+      if (onComponentsChange) {
+        onComponentsChange(components);
+      }
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -354,24 +357,30 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [resizing, zoom, notifyParent]);
+  }, [resizing, zoom, onComponentsChange]);
 
   const updateComponent = useCallback((id, updates) => {
-    const newComponents = components.map(c =>
-      c.id === id ? { ...c, ...updates } : c
-    );
-    setComponents(newComponents);
-    addToHistory(newComponents);
-    notifyParent(newComponents);
-
-    const updated = newComponents.find(c => c.id === id);
-    if (updated) {
-      onSelectionChange?.(updated);
-    }
-  }, [components, addToHistory, onSelectionChange, notifyParent]);
+    setComponents(prev => {
+      const newComponents = prev.map(c =>
+        c.id === id ? { ...c, ...updates } : c
+      );
+      if (onComponentsChange) onComponentsChange(newComponents);
+      
+      const updated = newComponents.find(c => c.id === id);
+      if (updated && onSelectionChange) {
+        onSelectionChange(updated);
+      }
+      
+      return newComponents;
+    });
+    addToHistory(components);
+  }, [addToHistory, onSelectionChange, onComponentsChange]);
 
   useEffect(() => {
     window.__updateComponent = updateComponent;
+    return () => {
+      delete window.__updateComponent;
+    };
   }, [updateComponent]);
 
   const renderResizeHandles = (component) => {
@@ -558,7 +567,7 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
         onClick={(e) => {
           e.stopPropagation();
           setSelectedId(component.id);
-          onSelectionChange?.(component);
+          if (onSelectionChange) onSelectionChange(component);
         }}
       >
         {content}
@@ -621,7 +630,7 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
         onDragOver={handleDragOver}
         onClick={() => {
           setSelectedId(null);
-          onSelectionChange?.(null);
+          if (onSelectionChange) onSelectionChange(null);
         }}
       >
         <div

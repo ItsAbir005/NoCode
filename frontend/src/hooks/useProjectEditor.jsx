@@ -10,11 +10,11 @@ export function useProjectEditor(projectId) {
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [selectedComponent, setSelectedComponent] = useState(null);
-  const [currentPageComponents, setCurrentPageComponents] = useState([]);
   const [currentPageId, setCurrentPageId] = useState('home');
+  const [pages, setPages] = useState([]);
   const stateManager = useRef(null);
   const navigate = useNavigate();
-  const [pages, setPages] = useState([]);
+  const isSwitchingPage = useRef(false);
 
   // Initialize state manager
   useEffect(() => {
@@ -27,40 +27,6 @@ export function useProjectEditor(projectId) {
       }
     };
   }, [projectId]);
-  const switchPage = useCallback((pageId) => {
-    console.log('Switching to page:', pageId);
-    // 1. Save current page components to the pages array
-    const updatedPages = pages.map(page =>
-      page.id === currentPageId
-        ? { ...page, components: components }
-        : page
-    );
-
-    // 2. Find new page
-    const newPage = updatedPages.find(p => p.id === pageId);
-    if (!newPage) {
-      console.error(`Page not found: ${pageId}`);
-      return;
-    }
-
-    console.log('Found new page:', newPage);
-
-
-    // 3. Update state
-    setPages(updatedPages);
-    setCurrentPageId(pageId);
-    setComponents(newPage.components || []);
-
-    // 4. Reset history for the new page
-    setHistory([newPage.components || []]);
-    setHistoryIndex(0);
-    setSaveStatus('saved');
-
-    // 5. Trigger auto-save to persist the switch (optional, but good for syncing)
-    // We don't save to backend immediately on simple switch to avoid lag, 
-    // but we ensure 'pages' state is correct for the next save.
-  }, [currentPageId, components, pages]);
-
 
   // Load project
   const loadProject = async () => {
@@ -100,7 +66,6 @@ export function useProjectEditor(projectId) {
       // Initialize state from first page
       const firstPage = loadedPages[0];
       setCurrentPageId(firstPage.id);
-      setCurrentPageComponents(firstPage.components || []);
       setComponents(firstPage.components || []);
 
       setHistory([firstPage.components || []]);
@@ -113,6 +78,54 @@ export function useProjectEditor(projectId) {
 
     setLoading(false);
   };
+
+  // Switch to a different page
+  const switchPage = useCallback((pageId) => {
+    console.log('🔄 Switching to page:', pageId);
+    isSwitchingPage.current = true;
+
+    // 1. Save current page components before switching
+    setPages(prevPages => {
+      const updatedPages = prevPages.map(page =>
+        page.id === currentPageId
+          ? { ...page, components: components }
+          : page
+      );
+
+      // 2. Find new page
+      const newPage = updatedPages.find(p => p.id === pageId);
+      if (!newPage) {
+        console.error(`❌ Page not found: ${pageId}`);
+        isSwitchingPage.current = false;
+        return prevPages;
+      }
+
+      console.log('✅ Found new page:', newPage.name, 'with', newPage.components?.length || 0, 'components');
+
+      // 3. Update current page ID
+      setCurrentPageId(pageId);
+
+      // 4. Update components for the new page
+      setComponents(newPage.components || []);
+
+      // 5. Reset history for the new page
+      setHistory([newPage.components || []]);
+      setHistoryIndex(0);
+      setSaveStatus('saved');
+      setSelectedComponent(null);
+
+      // 6. Save to backend
+      setTimeout(() => {
+        saveProject({
+          pages: JSON.stringify(updatedPages),
+          components: JSON.stringify(newPage.components || [])
+        });
+        isSwitchingPage.current = false;
+      }, 100);
+
+      return updatedPages;
+    });
+  }, [currentPageId, components]);
 
   // Save project
   const saveProject = useCallback(async (data) => {
@@ -131,8 +144,8 @@ export function useProjectEditor(projectId) {
       } catch (e) {
         console.error("Error parsing provided pages:", e);
       }
-    } else {
-      // Otherwise, assume we are just updating components on the current page
+    } else if (!isSwitchingPage.current) {
+      // Only update current page components if not switching
       finalPages = pages.map(p =>
         p.id === currentPageId ? { ...p, components: currentComponents } : p
       );
@@ -169,8 +182,15 @@ export function useProjectEditor(projectId) {
 
   // Update components with auto-save
   const updateComponents = useCallback((newComponents) => {
+    if (isSwitchingPage.current) {
+      console.log('⏭️ Ignoring component update during page switch');
+      return;
+    }
+
+    console.log('📝 Updating components:', newComponents.length);
     setComponents(newComponents);
     setSaveStatus('unsaved');
+    
     setHistory(prev => {
       const nextIndex = historyIndex + 1;
       const newHistory = prev.slice(0, nextIndex);
@@ -181,14 +201,14 @@ export function useProjectEditor(projectId) {
     setHistoryIndex(prev => Math.min(prev + 1, 49));
 
     // Update pages state
-    const updatedPages = pages.map(p =>
-      p.id === currentPageId ? { ...p, components: newComponents } : p
+    setPages(prevPages => 
+      prevPages.map(p =>
+        p.id === currentPageId ? { ...p, components: newComponents } : p
+      )
     );
-    setPages(updatedPages);
 
     // Format data for save
     const saveData = {
-      pages: JSON.stringify(updatedPages),
       components: JSON.stringify(newComponents)
     };
 
@@ -197,7 +217,7 @@ export function useProjectEditor(projectId) {
       2000,
       (status) => setSaveStatus(status)
     );
-  }, [historyIndex, pages, currentPageId]);
+  }, [historyIndex, currentPageId]);
 
   // Undo
   const undo = useCallback(() => {
@@ -235,7 +255,7 @@ export function useProjectEditor(projectId) {
 
   // Start periodic save
   useEffect(() => {
-    if (stateManager.current && !loading) {
+    if (stateManager.current && !loading && !isSwitchingPage.current) {
       stateManager.current.startPeriodicSave(
         () => {
           const updatedPages = pages.map(p =>
@@ -275,11 +295,12 @@ export function useProjectEditor(projectId) {
     canUndo: historyIndex > 0,
     canRedo: historyIndex < history.length - 1,
     lastSaved: stateManager.current?.getLastSaveFormatted(),
+    currentPageId,
 
     // Actions
     updateComponents,
     setSelectedComponent,
-    switchPage, // Exported
+    switchPage,
     undo,
     redo,
     manualSave,
@@ -287,3 +308,4 @@ export function useProjectEditor(projectId) {
     reloadProject: loadProject,
   };
 }
+export default useProjectEditor;
