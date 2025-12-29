@@ -27,7 +27,16 @@ export function PageManager({ project, pages = [], onPagesUpdate, currentPageId,
     }
     if (confirm('Are you sure you want to delete this page?')) {
       const updated = pages.filter(p => p.id !== pageId);
+      
+      // Make sure we have at least one page
+      if (updated.length === 0) {
+        alert('Cannot delete the last page');
+        return;
+      }
+      
       onPagesUpdate(updated);
+      
+      // If we deleted the current page, switch to the first page
       if (currentPageId === pageId) {
         onPageChange(updated[0].id);
       }
@@ -57,6 +66,13 @@ export function PageManager({ project, pages = [], onPagesUpdate, currentPageId,
 
   const handlePageClick = (pageId) => {
     if (editingId === null) {
+      // Validate the page exists before switching
+      const pageExists = pages.find(p => p.id === pageId);
+      if (!pageExists) {
+        console.error('Attempted to switch to non-existent page:', pageId);
+        return;
+      }
+      console.log('PageManager: Switching to page', pageId, ':', pageExists.name);
       onPageChange(pageId);
     }
   };

@@ -27,7 +27,6 @@ export function useProjectEditor(projectId) {
       }
     };
   }, [projectId]);
-
   // Load project
   const loadProject = async () => {
     setLoading(true);
@@ -48,12 +47,20 @@ export function useProjectEditor(projectId) {
           loadedPages = [{ id: 'home', name: 'Home', path: '/', components: [] }];
         }
 
-        // Sanitize pages: ensure every page has a path
-        loadedPages = loadedPages.map((page, index) => ({
-          ...page,
-          path: page.path || (page.id === 'home' ? '/' : `/page-${index + 1}`),
-          components: page.components || []
-        }));
+        // Sanitize pages: ensure every page has required fields
+        loadedPages = loadedPages.map((page, index) => {
+          // Generate a valid page ID if missing
+          const pageId = page.id || `page-${Date.now()}-${index}`;
+
+          return {
+            id: pageId,
+            name: page.name || `Page ${index + 1}`,
+            path: page.path || (pageId === 'home' ? '/' : `/page-${index + 1}`),
+            components: Array.isArray(page.components) ? page.components : []
+          };
+        });
+
+        console.log('📄 Loaded pages:', loadedPages.map(p => ({ id: p.id, name: p.name, components: p.components?.length })));
       } catch (e) {
         console.error('Error parsing pages:', e);
         loadedPages = [{ id: 'home', name: 'Home', path: '/', components: [] }];
@@ -78,10 +85,17 @@ export function useProjectEditor(projectId) {
 
     setLoading(false);
   };
-
   // Switch to a different page
   const switchPage = useCallback((pageId) => {
     console.log('🔄 Switching to page:', pageId);
+
+    // Validate that the page exists
+    const targetPage = pages.find(p => p.id === pageId);
+    if (!targetPage) {
+      console.error(`❌ Page not found: ${pageId}, available pages:`, pages.map(p => ({ id: p.id, name: p.name })));
+      return;
+    }
+
     isSwitchingPage.current = true;
 
     // 1. Save current page components before switching
@@ -92,10 +106,10 @@ export function useProjectEditor(projectId) {
           : page
       );
 
-      // 2. Find new page
+      // 2. Find new page (should exist based on validation above)
       const newPage = updatedPages.find(p => p.id === pageId);
       if (!newPage) {
-        console.error(`❌ Page not found: ${pageId}`);
+        console.error(`❌ Page not found in updated pages: ${pageId}`);
         isSwitchingPage.current = false;
         return prevPages;
       }
@@ -125,7 +139,7 @@ export function useProjectEditor(projectId) {
 
       return updatedPages;
     });
-  }, [currentPageId, components]);
+  }, [currentPageId, components, pages, saveProject]);
 
   // Save project
   const saveProject = useCallback(async (data) => {
@@ -190,7 +204,7 @@ export function useProjectEditor(projectId) {
     console.log('📝 Updating components:', newComponents.length);
     setComponents(newComponents);
     setSaveStatus('unsaved');
-    
+
     setHistory(prev => {
       const nextIndex = historyIndex + 1;
       const newHistory = prev.slice(0, nextIndex);
@@ -201,7 +215,7 @@ export function useProjectEditor(projectId) {
     setHistoryIndex(prev => Math.min(prev + 1, 49));
 
     // Update pages state
-    setPages(prevPages => 
+    setPages(prevPages =>
       prevPages.map(p =>
         p.id === currentPageId ? { ...p, components: newComponents } : p
       )
