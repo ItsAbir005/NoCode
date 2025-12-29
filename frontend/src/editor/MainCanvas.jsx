@@ -13,26 +13,19 @@ export function MainCanvas({ onSelectionChange, initialComponents = [], onCompon
   const [resizing, setResizing] = useState(null);
   const isInitialized = useRef(false);
   const prevInitialComponents = useRef([]);
-
-  // Initialize components from props ONCE or when they actually change
   useEffect(() => {
-    // Only update if initialComponents actually changed (deep comparison of length and IDs)
-    const hasChanged = 
+    // Check if this is a meaningful change
+    const componentsChanged = 
       initialComponents.length !== prevInitialComponents.current.length ||
       JSON.stringify(initialComponents.map(c => c.id)) !== JSON.stringify(prevInitialComponents.current.map(c => c.id));
 
-    if (hasChanged && initialComponents.length > 0) {
-      console.log('MainCanvas initializing with components:', initialComponents);
+    // Always update if components changed (including empty array)
+    if (componentsChanged || !isInitialized.current) {
+      console.log('MainCanvas initializing with components:', initialComponents.length, 'components');
       setComponents(initialComponents);
       setHistory([initialComponents]);
       setHistoryIndex(0);
       prevInitialComponents.current = initialComponents;
-      isInitialized.current = true;
-    } else if (!isInitialized.current && initialComponents.length === 0) {
-      // First mount with empty components
-      setComponents([]);
-      setHistory([[]]);
-      setHistoryIndex(0);
       isInitialized.current = true;
     }
   }, [initialComponents]);

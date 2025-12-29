@@ -85,6 +85,60 @@ export function useProjectEditor(projectId) {
 
     setLoading(false);
   };
+  // Save project changes
+  // Save project
+  const saveProject = useCallback(async (data) => {
+    setSaveStatus('saving');
+
+    // Get latest state
+    const currentComponents = data.components || components;
+    let finalPages = pages;
+
+    // Check if we are updating the pages structure directly
+    if (data.pages) {
+      try {
+        finalPages = typeof data.pages === 'string'
+          ? JSON.parse(data.pages)
+          : data.pages;
+      } catch (e) {
+        console.error("Error parsing provided pages:", e);
+      }
+    } else if (!isSwitchingPage.current) {
+      // Only update current page components if not switching
+      finalPages = pages.map(p =>
+        p.id === currentPageId ? { ...p, components: currentComponents } : p
+      );
+    }
+
+    const saveData = {
+      ...data,
+      pages: JSON.stringify(finalPages),
+      components: JSON.stringify(currentComponents)
+    };
+
+    const result = await stateManager.current.saveProject(saveData);
+
+    if (result.success) {
+      setSaveStatus('saved');
+      if (result.data) {
+        setProject(prev => ({
+          ...prev,
+          ...result.data,
+          pages: finalPages
+        }));
+
+        // If we updated pages structure from outside (e.g. PageManager), sync local state
+        if (data.pages) {
+          setPages(finalPages);
+        }
+      }
+      return true;
+    } else {
+      setSaveStatus('error');
+      return false;
+    }
+  }, [components, pages, currentPageId]);
+  
   // Switch to a different page
   const switchPage = useCallback((pageId) => {
     console.log('🔄 Switching to page:', pageId);
@@ -140,59 +194,6 @@ export function useProjectEditor(projectId) {
       return updatedPages;
     });
   }, [currentPageId, components, pages, saveProject]);
-
-  // Save project
-  const saveProject = useCallback(async (data) => {
-    setSaveStatus('saving');
-
-    // Get latest state
-    const currentComponents = data.components || components;
-    let finalPages = pages;
-
-    // Check if we are updating the pages structure directly
-    if (data.pages) {
-      try {
-        finalPages = typeof data.pages === 'string'
-          ? JSON.parse(data.pages)
-          : data.pages;
-      } catch (e) {
-        console.error("Error parsing provided pages:", e);
-      }
-    } else if (!isSwitchingPage.current) {
-      // Only update current page components if not switching
-      finalPages = pages.map(p =>
-        p.id === currentPageId ? { ...p, components: currentComponents } : p
-      );
-    }
-
-    const saveData = {
-      ...data,
-      pages: JSON.stringify(finalPages),
-      components: JSON.stringify(currentComponents)
-    };
-
-    const result = await stateManager.current.saveProject(saveData);
-
-    if (result.success) {
-      setSaveStatus('saved');
-      if (result.data) {
-        setProject(prev => ({
-          ...prev,
-          ...result.data,
-          pages: finalPages
-        }));
-
-        // If we updated pages structure from outside (e.g. PageManager), sync local state
-        if (data.pages) {
-          setPages(finalPages);
-        }
-      }
-      return true;
-    } else {
-      setSaveStatus('error');
-      return false;
-    }
-  }, [components, pages, currentPageId]);
 
   // Update components with auto-save
   const updateComponents = useCallback((newComponents) => {
