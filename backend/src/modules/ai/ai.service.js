@@ -66,7 +66,7 @@ Return ONLY the JSON array, no markdown or explanation.`;
       x: Math.min(Math.max(0, comp.x || 50), 924),
       y: Math.min(Math.max(0, comp.y || 50), 500),
     }));
-    
+
     return validatedComponents;
   } catch (error) {
     console.error('Gemini generation error:', error);
@@ -96,12 +96,12 @@ Example: ["Add hover effect", "Increase padding", "Add icon"]`;
 
     const result = await model.generateContent(prompt);
     const response = result.response.text();
-    
+
     let jsonText = response.trim();
     if (jsonText.startsWith('```')) {
       jsonText = jsonText.replace(/```json?\n?/g, '').replace(/```\n?/g, '');
     }
-    
+
     const suggestions = JSON.parse(jsonText);
     return Array.isArray(suggestions) ? suggestions.slice(0, 5) : [];
   } catch (error) {
@@ -130,12 +130,12 @@ Return ONLY the JSON object, no explanation.`;
 
     const result = await model.generateContent(prompt);
     const response = result.response.text();
-    
+
     let jsonText = response.trim();
     if (jsonText.startsWith('```')) {
       jsonText = jsonText.replace(/```json?\n?/g, '').replace(/```\n?/g, '');
     }
-    
+
     const improved = JSON.parse(jsonText);
     return { ...component, ...improved, id: component.id };
   } catch (error) {
@@ -168,15 +168,158 @@ Return ONLY the JSON object.`;
 
     const result = await model.generateContent(prompt);
     const response = result.response.text();
-    
+
     let jsonText = response.trim();
     if (jsonText.startsWith('```')) {
       jsonText = jsonText.replace(/```json?\n?/g, '').replace(/```\n?/g, '');
     }
-    
+
     return JSON.parse(jsonText);
   } catch (error) {
     console.error('Workflow generation error:', error);
     throw new Error('Failed to generate workflow');
+  }
+};
+exports.generateWorkflowFromPrompt = async (prompt, components = []) => {
+  try {
+    const systemPrompt = `You are a workflow automation expert. Convert natural language descriptions into workflow JSON definitions.
+
+Available components: ${components.map(c => `${c.type} (${c.id})`).join(', ')}
+
+Workflow structure:
+{
+  "name": "Workflow name",
+  "description": "What it does",
+  "trigger": {
+    "type": "click|submit|load",
+    "componentId": "component-id" // required for click/submit, omit for load
+  },
+  "actions": [
+    {
+      "type": "show|hide|setValue|validate|navigate|alert",
+      "target": "component-id", // required for show/hide/setValue/validate
+      "params": {} // optional parameters
+    }
+  ]
+}
+
+Action types explained:
+- show: Make a component visible (requires target)
+- hide: Hide a component (requires target)
+- setValue: Set a component's value (requires target and params.value)
+- validate: Validate input field (requires target)
+- navigate: Navigate to path (requires params.path)
+- alert: Show alert message (requires params.message)
+
+Examples:
+
+User: "When submit button is clicked, validate the email input and show success message"
+Response:
+{
+  "name": "Form Validation",
+  "description": "Validate email and show success",
+  "trigger": {
+    "type": "click",
+    "componentId": "button-123"
+  },
+  "actions": [
+    {
+      "type": "validate",
+      "target": "input-456"
+    },
+    {
+      "type": "alert",
+      "params": {
+        "message": "Form submitted successfully!"
+      }
+    }
+  ]
+}
+
+User: "On page load, hide the login form"
+Response:
+{
+  "name": "Hide Login on Load",
+  "description": "Hide login form when page loads",
+  "trigger": {
+    "type": "load"
+  },
+  "actions": [
+    {
+      "type": "hide",
+      "target": "container-789"
+    }
+  ]
+}
+
+User request: "${prompt}"
+
+Return ONLY a valid JSON workflow object, no markdown or explanation.`;
+
+    const result = await model.generateContent(systemPrompt);
+    const response = result.response.text();
+
+    let jsonText = response.trim();
+    if (jsonText.startsWith('```')) {
+      jsonText = jsonText.replace(/```json?\n?/g, '').replace(/```\n?/g, '');
+    }
+
+    const workflow = JSON.parse(jsonText);
+
+    // Add unique ID
+    workflow.id = `workflow-${Date.now()}`;
+
+    // Validate workflow structure
+    if (!workflow.name || !workflow.trigger || !workflow.actions) {
+      throw new Error('Invalid workflow structure');
+    }
+
+    return workflow;
+  } catch (error) {
+    console.error('Workflow generation error:', error);
+    throw new Error('Failed to generate workflow: ' + error.message);
+  }
+};
+
+// Generate multiple workflow suggestions
+exports.suggestWorkflows = async (components = []) => {
+  try {
+    const prompt = `Analyze these UI components and suggest 3-5 useful workflows.
+
+Components: ${components.map(c => `${c.type} (${c.id})`).join(', ')}
+
+Suggest workflows that would be useful for these components. Focus on:
+- Form validation and submission
+- Component visibility toggling
+- User interactions
+- Navigation flows
+- Data validation
+
+Return a JSON array of workflow objects. Each workflow should have:
+- name: descriptive name
+- description: what it does
+- trigger: { type, componentId }
+- actions: array of actions
+
+Return ONLY a JSON array, no explanation.`;
+
+    const result = await model.generateContent(prompt);
+    const response = result.response.text();
+
+    let jsonText = response.trim();
+    if (jsonText.startsWith('```')) {
+      jsonText = jsonText.replace(/```json?\n?/g, '').replace(/```\n?/g, '');
+    }
+
+    const workflows = JSON.parse(jsonText);
+
+    // Add unique IDs
+    return workflows.map((workflow, index) => ({
+      ...workflow,
+      id: `workflow-${Date.now()}-${index}`
+    }));
+  } catch (error) {
+    console.error('Workflow suggestions error:', error);
+    return [];
   }
 };

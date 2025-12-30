@@ -90,3 +90,45 @@ exports.generateWorkflow = async (req, res) => {
     });
   }
 };
+
+exports.generateWorkflowFromPrompt = async (req, res) => {
+  try {
+    const { prompt, components = [] } = req.body;
+
+    if (!prompt) {
+      return res.status(400).json({ error: 'Prompt is required' });
+    }
+
+    const workflow = await service.generateWorkflowFromPrompt(prompt, components);
+
+    res.json({
+      success: true,
+      workflow
+    });
+  } catch (error) {
+    console.error('Workflow generation error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+exports.suggestWorkflows = async (req, res) => {
+  try {
+    const { components = [] } = req.body;
+
+    const workflows = await service.suggestWorkflows(components);
+
+    res.json({
+      success: true,
+      workflows
+    });
+  } catch (error) {
+    console.error('Workflow suggestions error:', error);
+    res.status(500).json({
+      success: false,
+      workflows: []
+    });
+  }
+};

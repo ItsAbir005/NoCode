@@ -19,7 +19,7 @@ const ProjectEditor = ({ projectId }) => {
   const [isResizing, setIsResizing] = useState(false);
   const [leftSidebarTab, setLeftSidebarTab] = useState('components'); // 'components' or 'workflows'
   const navigate = useNavigate();
-  
+
   const {
     project,
     components,
@@ -47,8 +47,8 @@ const ProjectEditor = ({ projectId }) => {
   useEffect(() => {
     if (project?.workflows) {
       try {
-        const parsedWorkflows = typeof project.workflows === 'string' 
-          ? JSON.parse(project.workflows) 
+        const parsedWorkflows = typeof project.workflows === 'string'
+          ? JSON.parse(project.workflows)
           : project.workflows;
         setWorkflows(Array.isArray(parsedWorkflows) ? parsedWorkflows : []);
       } catch (e) {
@@ -91,7 +91,7 @@ const ProjectEditor = ({ projectId }) => {
     const merged = [...components, ...newComponents];
     console.log('Merged components:', merged);
     updateComponents(merged);
-    
+
     setTimeout(async () => {
       console.log('Force saving after AI generation...');
       const saved = await manualSave();
@@ -228,7 +228,7 @@ const ProjectEditor = ({ projectId }) => {
 
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar with Tabs */}
-        <div 
+        <div
           className="border-r border-gray-200 bg-white flex flex-col relative"
           style={{ width: `${leftSidebarWidth}px` }}
         >
@@ -236,22 +236,20 @@ const ProjectEditor = ({ projectId }) => {
           <div className="border-b border-gray-200 flex">
             <button
               onClick={() => setLeftSidebarTab('components')}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium border-b-2 transition-colors ${
-                leftSidebarTab === 'components'
-                  ? 'border-indigo-600 text-indigo-600 bg-indigo-50'
-                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-              }`}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium border-b-2 transition-colors ${leftSidebarTab === 'components'
+                ? 'border-indigo-600 text-indigo-600 bg-indigo-50'
+                : 'border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                }`}
             >
               <Layers className="w-4 h-4" />
               Components
             </button>
             <button
               onClick={() => setLeftSidebarTab('workflows')}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium border-b-2 transition-colors ${
-                leftSidebarTab === 'workflows'
-                  ? 'border-indigo-600 text-indigo-600 bg-indigo-50'
-                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-              }`}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium border-b-2 transition-colors ${leftSidebarTab === 'workflows'
+                ? 'border-indigo-600 text-indigo-600 bg-indigo-50'
+                : 'border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                }`}
             >
               <Workflow className="w-4 h-4" />
               Workflows
@@ -273,7 +271,7 @@ const ProjectEditor = ({ projectId }) => {
             currentPageId={currentPageId}
             onPageChange={switchPage}
           />
-          
+
           {/* Tab Content */}
           <div className="flex-1 overflow-hidden">
             {leftSidebarTab === 'components' ? (
@@ -286,12 +284,12 @@ const ProjectEditor = ({ projectId }) => {
               />
             )}
           </div>
-          
+
           {/* Resize Handle */}
           <div
             className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-indigo-500 bg-gray-300 transition-colors"
             onMouseDown={() => setIsResizing(true)}
-            style={{ 
+            style={{
               width: '4px',
               zIndex: 10
             }}
@@ -335,6 +333,8 @@ const ProjectEditor = ({ projectId }) => {
         <PreviewMode
           components={components}
           projectName={project.name}
+          workflows={workflows}
+          pages={pages}
           onClose={() => setShowPreview(false)}
         />
       )}

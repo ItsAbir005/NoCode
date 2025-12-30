@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { X, Maximize2, Minimize2, Monitor, Smartphone, Tablet } from 'lucide-react';
 
-export function PreviewMode({ components, projectName, onClose }) {
+export function PreviewMode({ components, projectName, workflows = [], pages = [], onClose }) {
   const [viewport, setViewport] = useState('desktop');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [componentStates, setComponentStates] = useState({});
 
   const viewportSizes = {
     desktop: { width: '100%', height: '100%', icon: Monitor },
@@ -14,6 +15,21 @@ export function PreviewMode({ components, projectName, onClose }) {
   useEffect(() => {
     // Prevent scrolling on body when preview is open
     document.body.style.overflow = 'hidden';
+    
+    // Initialize component states
+    const initialStates = {};
+    components.forEach(comp => {
+      initialStates[comp.id] = {
+        visible: true,
+        value: '',
+        checked: comp.checked || false
+      };
+    });
+    setComponentStates(initialStates);
+
+    // Execute 'load' workflows
+    executeWorkflowsByTrigger('load');
+
     return () => {
       document.body.style.overflow = 'auto';
     };
@@ -28,7 +44,107 @@ export function PreviewMode({ components, projectName, onClose }) {
     setIsFullscreen(!isFullscreen);
   };
 
+  const executeWorkflow = (workflow) => {
+    console.log('Executing workflow:', workflow.name);
+    
+    if (!workflow.actions || workflow.actions.length === 0) {
+      console.log('No actions in workflow');
+      return;
+    }
+
+    workflow.actions.forEach((action, index) => {
+      setTimeout(() => {
+        executeAction(action);
+      }, index * 100); // Stagger actions by 100ms
+    });
+  };
+
+  const executeAction = (action) => {
+    console.log('Executing action:', action);
+
+    switch (action.type) {
+      case 'show':
+        if (action.target) {
+          setComponentStates(prev => ({
+            ...prev,
+            [action.target]: { ...prev[action.target], visible: true }
+          }));
+        }
+        break;
+
+      case 'hide':
+        if (action.target) {
+          setComponentStates(prev => ({
+            ...prev,
+            [action.target]: { ...prev[action.target], visible: false }
+          }));
+        }
+        break;
+
+      case 'setValue':
+        if (action.target && action.params?.value !== undefined) {
+          setComponentStates(prev => ({
+            ...prev,
+            [action.target]: { ...prev[action.target], value: action.params.value }
+          }));
+        }
+        break;
+
+      case 'navigate':
+        if (action.params?.path) {
+          alert(`Navigation to: ${action.params.path}`);
+        }
+        break;
+
+      case 'alert':
+        if (action.params?.message) {
+          alert(action.params.message);
+        }
+        break;
+
+      case 'validate':
+        if (action.target) {
+          const component = components.find(c => c.id === action.target);
+          const state = componentStates[action.target];
+          if (component && state) {
+            if (!state.value || state.value.trim() === '') {
+              alert(`Validation failed: ${component.placeholder || 'Field'} is required`);
+            } else {
+              alert('Validation passed!');
+            }
+          }
+        }
+        break;
+
+      default:
+        console.log('Unknown action type:', action.type);
+    }
+  };
+
+  const executeWorkflowsByTrigger = (triggerType, componentId = null) => {
+    const matchingWorkflows = workflows.filter(workflow => {
+      if (workflow.trigger.type !== triggerType) return false;
+      if (triggerType === 'load') return true;
+      return workflow.trigger.componentId === componentId;
+    });
+
+    matchingWorkflows.forEach(workflow => {
+      executeWorkflow(workflow);
+    });
+  };
+
+  const handleComponentClick = (componentId) => {
+    executeWorkflowsByTrigger('click', componentId);
+  };
+
+  const handleComponentSubmit = (componentId) => {
+    executeWorkflowsByTrigger('submit', componentId);
+  };
+
   const renderComponent = (component) => {
+    const state = componentStates[component.id];
+    if (!state || !state.visible) return null;
+
     const style = {
       position: 'absolute',
       left: component.x,
@@ -52,7 +168,10 @@ export function PreviewMode({ components, projectName, onClose }) {
               fontWeight: 500,
               cursor: 'pointer',
             }}
-            onClick={() => alert(`Button "${component.text}" clicked!`)}
+            onClick={() => {
+              handleComponentClick(component.id);
+              alert(`Button "${component.text}" clicked!`);
+            }}
           >
             {component.text}
           </button>
@@ -79,6 +198,18 @@ export function PreviewMode({ components, projectName, onClose }) {
           <input
             key={component.id}
             placeholder={component.placeholder}
+            value={state.value}
+            onChange={(e) => {
+              setComponentStates(prev => ({
+                ...prev,
+                [component.id]: { ...prev[component.id], value: e.target.value }
+              }));
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleComponentSubmit(component.id);
+              }
+            }}
             style={{
               ...style,
               padding: '8px',
@@ -123,7 +254,14 @@ export function PreviewMode({ components, projectName, onClose }) {
           <input
             key={component.id}
             type="checkbox"
-            defaultChecked={component.checked}
+            checked={state.checked}
+            onChange={(e) => {
+              setComponentStates(prev => ({
+                ...prev,
+                [component.id]: { ...prev[component.id], checked: e.target.checked }
+              }));
+              handleComponentClick(component.id);
+            }}
             style={{
               ...style,
               cursor: 'pointer',
@@ -136,7 +274,14 @@ export function PreviewMode({ components, projectName, onClose }) {
           <input
             key={component.id}
             type="radio"
-            defaultChecked={component.checked}
+            checked={state.checked}
+            onChange={(e) => {
+              setComponentStates(prev => ({
+                ...prev,
+                [component.id]: { ...prev[component.id], checked: e.target.checked }
+              }));
+              handleComponentClick(component.id);
+            }}
             style={{
               ...style,
               cursor: 'pointer',
@@ -169,10 +314,10 @@ export function PreviewMode({ components, projectName, onClose }) {
             }}
           >
             <div style={{ fontSize: '18px', fontWeight: 600, marginBottom: '8px' }}>
-              Card Title
+              {component.title || 'Card Title'}
             </div>
             <div style={{ fontSize: '14px', color: '#6b7280' }}>
-              Card content goes here
+              {component.content || 'Card content goes here'}
             </div>
           </div>
         );
@@ -236,6 +381,44 @@ export function PreviewMode({ components, projectName, onClose }) {
           </div>
         );
 
+      case 'Alert':
+        return (
+          <div
+            key={component.id}
+            style={{
+              ...style,
+              backgroundColor: component.backgroundColor,
+              border: component.border,
+              borderRadius: component.borderRadius || 8,
+              padding: '12px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              fontSize: '14px',
+            }}
+          >
+            {component.text}
+          </div>
+        );
+
+      case 'Navbar':
+        return (
+          <div
+            key={component.id}
+            style={{
+              ...style,
+              backgroundColor: component.backgroundColor,
+              color: component.color,
+              display: 'flex',
+              alignItems: 'center',
+              padding: '0 16px',
+              fontSize: '16px',
+              fontWeight: 600,
+            }}
+          >
+            Navigation Bar
+          </div>
+        );
+
       default:
         return (
           <div
@@ -263,6 +446,14 @@ export function PreviewMode({ components, projectName, onClose }) {
       <div className="h-14 bg-gray-900 border-b border-gray-700 flex items-center justify-between px-4">
         <div className="flex items-center gap-4">
           <h2 className="text-white font-semibold">{projectName} - Preview</h2>
+          
+          {/* Workflow Indicator */}
+          {workflows && workflows.length > 0 && (
+            <span className="px-2 py-1 bg-green-600 text-white text-xs rounded-full flex items-center gap-1">
+              <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span>
+              {workflows.length} workflow{workflows.length !== 1 ? 's' : ''} active
+            </span>
+          )}
           
           {/* Viewport Selector */}
           <div className="flex items-center gap-1 bg-gray-800 rounded-lg p-1">
@@ -335,7 +526,7 @@ export function PreviewMode({ components, projectName, onClose }) {
 
       {/* Info Bar */}
       <div className="h-10 bg-gray-900 border-t border-gray-700 flex items-center justify-between px-4 text-sm text-gray-400">
-        <span>{components.length} components</span>
+        <span>{components.length} components • {workflows?.length || 0} workflows</span>
         <span>
           {viewportSizes[viewport].width} × {viewportSizes[viewport].height}
         </span>
