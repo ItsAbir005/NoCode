@@ -1,3 +1,4 @@
+// frontend/src/components/ProjectEditor.jsx
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProjectEditor } from '../hooks/useProjectEditor';
@@ -8,13 +9,15 @@ import { RightSidebar } from '../editor/RightSidebar';
 import { AIChatPanel } from '../editor/AIChatPanel';
 import { PreviewMode } from './PreviewMode';
 import { PageManager } from './PageManager';
-import { Cloud, CloudOff, AlertCircle, Loader2 } from 'lucide-react';
+import { WorkflowBuilder } from './WorkflowBuilder';
+import { Cloud, CloudOff, AlertCircle, Loader2, Layout, Workflow, Layers } from 'lucide-react';
 
 const ProjectEditor = ({ projectId }) => {
   const [isAIOpen, setIsAIOpen] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
-  const [leftSidebarWidth, setLeftSidebarWidth] = useState(256);
+  const [leftSidebarWidth, setLeftSidebarWidth] = useState(280);
   const [isResizing, setIsResizing] = useState(false);
+  const [leftSidebarTab, setLeftSidebarTab] = useState('components'); // 'components' or 'workflows'
   const navigate = useNavigate();
   
   const {
@@ -36,6 +39,30 @@ const ProjectEditor = ({ projectId }) => {
     currentPageId,
     pages,
   } = useProjectEditor(projectId);
+
+  // Workflow state
+  const [workflows, setWorkflows] = useState([]);
+
+  // Load workflows from project
+  useEffect(() => {
+    if (project?.workflows) {
+      try {
+        const parsedWorkflows = typeof project.workflows === 'string' 
+          ? JSON.parse(project.workflows) 
+          : project.workflows;
+        setWorkflows(Array.isArray(parsedWorkflows) ? parsedWorkflows : []);
+      } catch (e) {
+        console.error('Error parsing workflows:', e);
+        setWorkflows([]);
+      }
+    }
+  }, [project]);
+
+  // Save workflows
+  const handleWorkflowsChange = async (newWorkflows) => {
+    setWorkflows(newWorkflows);
+    await updateProjectMetadata({ workflows: JSON.stringify(newWorkflows) });
+  };
 
   const handleProjectNameChange = async (newName) => {
     await updateProjectMetadata({ name: newName });
@@ -139,7 +166,7 @@ const ProjectEditor = ({ projectId }) => {
     if (!isResizing) return;
 
     const handleMouseMove = (e) => {
-      const newWidth = Math.max(200, Math.min(500, e.clientX));
+      const newWidth = Math.max(240, Math.min(500, e.clientX));
       setLeftSidebarWidth(newWidth);
     };
 
@@ -200,10 +227,43 @@ const ProjectEditor = ({ projectId }) => {
       />
 
       <div className="flex-1 flex overflow-hidden">
+        {/* Left Sidebar with Tabs */}
         <div 
           className="border-r border-gray-200 bg-white flex flex-col relative"
           style={{ width: `${leftSidebarWidth}px` }}
         >
+          {/* Tabs */}
+          <div className="border-b border-gray-200 flex">
+            <button
+              onClick={() => setLeftSidebarTab('components')}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium border-b-2 transition-colors ${
+                leftSidebarTab === 'components'
+                  ? 'border-indigo-600 text-indigo-600 bg-indigo-50'
+                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              <Layers className="w-4 h-4" />
+              Components
+            </button>
+            <button
+              onClick={() => setLeftSidebarTab('workflows')}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium border-b-2 transition-colors ${
+                leftSidebarTab === 'workflows'
+                  ? 'border-indigo-600 text-indigo-600 bg-indigo-50'
+                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              <Workflow className="w-4 h-4" />
+              Workflows
+              {workflows.length > 0 && (
+                <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-600 text-xs rounded-full">
+                  {workflows.length}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* Page Manager (always visible at top) */}
           <PageManager
             project={project}
             pages={pages}
@@ -213,8 +273,18 @@ const ProjectEditor = ({ projectId }) => {
             currentPageId={currentPageId}
             onPageChange={switchPage}
           />
+          
+          {/* Tab Content */}
           <div className="flex-1 overflow-hidden">
-            <LeftSidebar />
+            {leftSidebarTab === 'components' ? (
+              <LeftSidebar />
+            ) : (
+              <WorkflowBuilder
+                workflows={workflows}
+                onWorkflowsChange={handleWorkflowsChange}
+                components={components}
+              />
+            )}
           </div>
           
           {/* Resize Handle */}
@@ -228,6 +298,7 @@ const ProjectEditor = ({ projectId }) => {
           />
         </div>
 
+        {/* Main Canvas */}
         <div className="flex-1">
           <MainCanvas
             initialComponents={components}
@@ -237,6 +308,7 @@ const ProjectEditor = ({ projectId }) => {
           />
         </div>
 
+        {/* Right Sidebar */}
         <div className="w-80 border-l border-gray-200 bg-white">
           <RightSidebar
             selectedComponent={selectedComponent}
@@ -250,6 +322,7 @@ const ProjectEditor = ({ projectId }) => {
         </div>
       </div>
 
+      {/* AI Chat Panel */}
       <AIChatPanel
         isOpen={isAIOpen}
         onClose={() => setIsAIOpen(false)}
@@ -257,6 +330,7 @@ const ProjectEditor = ({ projectId }) => {
         onComponentsGenerated={handleComponentsGenerated}
       />
 
+      {/* Preview Modal */}
       {showPreview && (
         <PreviewMode
           components={components}

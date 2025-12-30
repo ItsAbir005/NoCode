@@ -1,3 +1,4 @@
+// frontend/src/editor/LeftSidebar.jsx
 import { useState } from "react";
 import {
   ChevronDown,
@@ -16,30 +17,17 @@ import {
   CreditCard,
   List,
   FileText,
-  Workflow,
   GripVertical,
-  Layout,
   Navigation,
   AlertCircle,
   Menu,
   Search,
-  Bell,
-  User,
-  Settings,
   Calendar,
-  Clock,
-  MapPin,
-  Star,
-  Heart,
-  ShoppingCart,
-  Phone,
-  Mail,
-  Globe,
 } from "lucide-react";
 
 const componentSections = [
   {
-    title: "Basic Elements",
+    title: "Basic",
     items: [
       { name: "Button", icon: Square, category: "basic" },
       { name: "Text", icon: Type, category: "basic" },
@@ -49,7 +37,7 @@ const componentSections = [
     ],
   },
   {
-    title: "Form Components",
+    title: "Forms",
     items: [
       { name: "Input", icon: FormInput, category: "form" },
       { name: "Checkbox", icon: CheckSquare, category: "form" },
@@ -64,21 +52,18 @@ const componentSections = [
     title: "Navigation",
     items: [
       { name: "Navbar", icon: Navigation, category: "navigation" },
-      { name: "Sidebar", icon: Layout, category: "navigation" },
+      { name: "Sidebar", icon: Menu, category: "navigation" },
       { name: "Breadcrumbs", icon: Navigation, category: "navigation" },
       { name: "Tabs", icon: Menu, category: "navigation" },
-      { name: "Pagination", icon: Menu, category: "navigation" },
     ],
   },
   {
-    title: "Data Display",
+    title: "Data",
     items: [
       { name: "Table", icon: Table, category: "data" },
       { name: "Chart", icon: BarChart3, category: "data" },
       { name: "Card", icon: CreditCard, category: "data" },
       { name: "List", icon: List, category: "data" },
-      { name: "Badge", icon: Circle, category: "data" },
-      { name: "Avatar", icon: User, category: "data" },
     ],
   },
   {
@@ -86,17 +71,6 @@ const componentSections = [
     items: [
       { name: "Alert", icon: AlertCircle, category: "feedback" },
       { name: "Modal", icon: Square, category: "feedback" },
-      { name: "Toast", icon: Bell, category: "feedback" },
-      { name: "Progress Bar", icon: Minus, category: "feedback" },
-      { name: "Spinner", icon: Circle, category: "feedback" },
-    ],
-  },
-  {
-    title: "Icons & Media",
-    items: [
-      { name: "Icon Button", icon: Star, category: "media" },
-      { name: "Video Player", icon: Square, category: "media" },
-      { name: "Audio Player", icon: Square, category: "media" },
     ],
   },
 ];
@@ -105,19 +79,19 @@ function CollapsibleSection({ title, children, defaultOpen = true }) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   return (
-    <div className="border-b border-gray-200 last:border-b-0">
+    <div className="border-b border-gray-100 last:border-b-0">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors"
+        className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
       >
         {isOpen ? (
-          <ChevronDown className="w-4 h-4" />
+          <ChevronDown className="w-3.5 h-3.5" />
         ) : (
-          <ChevronRight className="w-4 h-4" />
+          <ChevronRight className="w-3.5 h-3.5" />
         )}
         {title}
       </button>
-      {isOpen && <div className="pb-2">{children}</div>}
+      {isOpen && <div className="pb-1">{children}</div>}
     </div>
   );
 }
@@ -133,13 +107,13 @@ function DraggableComponentItem({ item }) {
 
   return (
     <div
-      className="flex items-center gap-2 px-3 py-2 mx-2 rounded-md text-sm text-gray-900 hover:bg-gray-100 cursor-grab active:cursor-grabbing transition-colors group"
+      className="flex items-center gap-2 px-3 py-1.5 mx-2 rounded text-xs text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 cursor-grab active:cursor-grabbing transition-colors group"
       draggable
       onDragStart={handleDragStart}
     >
       <GripVertical className="w-3 h-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-      <Icon className="w-4 h-4 text-gray-600" />
-      <span className="flex-1">{item.name}</span>
+      <Icon className="w-3.5 h-3.5" />
+      <span className="flex-1 font-medium">{item.name}</span>
     </div>
   );
 }
@@ -157,19 +131,15 @@ export function LeftSidebar() {
   return (
     <div className="h-full flex flex-col bg-white">
       <div className="p-3 border-b border-gray-200">
-        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-          Components
-        </h2>
-        
         {/* Search */}
         <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-gray-400" />
           <input
             type="text"
-            placeholder="Search components..."
+            placeholder="Search..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-8 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
           />
         </div>
       </div>
@@ -184,10 +154,17 @@ export function LeftSidebar() {
         ))}
 
         {filteredSections.length === 0 && (
-          <div className="p-4 text-center text-sm text-gray-500">
+          <div className="p-4 text-center text-xs text-gray-500">
             No components found
           </div>
         )}
+      </div>
+
+      {/* Help Text */}
+      <div className="p-3 border-t border-gray-200 bg-gray-50">
+        <p className="text-xs text-gray-600 text-center">
+          Drag components to canvas
+        </p>
       </div>
     </div>
   );
