@@ -1,5 +1,5 @@
 class ProjectStateManager {
-  constructor(projectId, apiUrl = 'http://localhost:8000') {
+  constructor(projectId, apiUrl=import.meta.env.VITE_API_URL || 'http://localhost:8000') {
     this.projectId = projectId;
     this.apiUrl = apiUrl;
     this.saveTimeout = null;

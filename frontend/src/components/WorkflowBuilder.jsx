@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Plus, Trash2, Play, Zap, MousePointer, Save, Sparkles, Wand2, Loader2 } from 'lucide-react';
+import { API_URL } from '../config/api';
 
 export function WorkflowBuilder({ workflows, onWorkflowsChange, components }) {
   const [selectedWorkflow, setSelectedWorkflow] = useState(null);
@@ -14,7 +15,7 @@ export function WorkflowBuilder({ workflows, onWorkflowsChange, components }) {
     actions: []
   });
 
-  const API_URL = 'http://localhost:8000';
+  const API_URL=import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
   const triggerTypes = [
     { value: 'click', label: 'On Click', icon: MousePointer },

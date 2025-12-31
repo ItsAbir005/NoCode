@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API_URL } from '../config/api';
 
 const Dashboard = () => {
   const [user, setUser] = useState(null);
@@ -7,7 +8,7 @@ const Dashboard = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newProject, setNewProject] = useState({ name: '', description: '' });
   const [creating, setCreating] = useState(false);
-  const API_URL = 'http://localhost:8000';
+  const API_URL=import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
   const handleNavigate = (path) => {
     window.location.href = path;

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { X, Send, Sparkles, Loader2, Wand2, Lightbulb, Zap } from "lucide-react";
+import { API_URL } from '../config/api';
 
 const quickPrompts = [
   "Create a login form with email and password",
@@ -16,7 +17,7 @@ export function AIChatPanel({ isOpen, onClose, onComponentsGenerated, existingCo
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const messagesEndRef = useRef(null);
-  const API_URL = 'http://localhost:8000';
+  const API_URL=import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
