@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
-import { X, Maximize2, Minimize2, Monitor, Smartphone, Tablet } from 'lucide-react';
+import { X, Maximize2, Minimize2, Monitor, Smartphone, Tablet, AlertCircle, CheckCircle } from 'lucide-react';
 
 export function PreviewMode({ components, projectName, workflows = [], pages = [], onClose }) {
   const [viewport, setViewport] = useState('desktop');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [componentStates, setComponentStates] = useState({});
+  const [currentPage, setCurrentPage] = useState(pages[0]?.id || 'home');
+  const [formData, setFormData] = useState({});
+  const [notifications, setNotifications] = useState([]);
 
   const viewportSizes = {
     desktop: { width: '100%', height: '100%', icon: Monitor },
@@ -13,27 +16,35 @@ export function PreviewMode({ components, projectName, workflows = [], pages = [
   };
 
   useEffect(() => {
-    // Prevent scrolling on body when preview is open
     document.body.style.overflow = 'hidden';
     
-    // Initialize component states
     const initialStates = {};
     components.forEach(comp => {
       initialStates[comp.id] = {
         visible: true,
         value: '',
-        checked: comp.checked || false
+        checked: comp.checked || false,
+        disabled: false,
+        loading: false,
+        error: null
       };
     });
     setComponentStates(initialStates);
 
-    // Execute 'load' workflows
     executeWorkflowsByTrigger('load');
 
     return () => {
       document.body.style.overflow = 'auto';
     };
   }, []);
+
+  const showNotification = (message, type = 'info') => {
+    const id = Date.now();
+    setNotifications(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    }, 3000);
+  };
 
   const handleFullscreen = () => {
     if (!isFullscreen) {
@@ -44,8 +55,8 @@ export function PreviewMode({ components, projectName, workflows = [], pages = [
     setIsFullscreen(!isFullscreen);
   };
 
-  const executeWorkflow = (workflow) => {
-    console.log('Executing workflow:', workflow.name);
+  const executeWorkflow = (workflow, eventData = {}) => {
+    console.log('🔥 Executing workflow:', workflow.name, 'with data:', eventData);
     
     if (!workflow.actions || workflow.actions.length === 0) {
       console.log('No actions in workflow');
@@ -54,13 +65,13 @@ export function PreviewMode({ components, projectName, workflows = [], pages = [
 
     workflow.actions.forEach((action, index) => {
       setTimeout(() => {
-        executeAction(action);
-      }, index * 100); // Stagger actions by 100ms
+        executeAction(action, eventData);
+      }, index * 100);
     });
   };
 
-  const executeAction = (action) => {
-    console.log('Executing action:', action);
+  const executeAction = (action, eventData = {}) => {
+    console.log('⚡ Executing action:', action.type, action);
 
     switch (action.type) {
       case 'show':
@@ -69,6 +80,7 @@ export function PreviewMode({ components, projectName, workflows = [], pages = [
             ...prev,
             [action.target]: { ...prev[action.target], visible: true }
           }));
+          showNotification(`Showing component`, 'success');
         }
         break;
 
@@ -78,6 +90,7 @@ export function PreviewMode({ components, projectName, workflows = [], pages = [
             ...prev,
             [action.target]: { ...prev[action.target], visible: false }
           }));
+          showNotification(`Hiding component`, 'success');
         }
         break;
 
@@ -87,18 +100,29 @@ export function PreviewMode({ components, projectName, workflows = [], pages = [
             ...prev,
             [action.target]: { ...prev[action.target], value: action.params.value }
           }));
+          setFormData(prev => ({
+            ...prev,
+            [action.target]: action.params.value
+          }));
+          showNotification(`Value updated`, 'success');
         }
         break;
 
       case 'navigate':
         if (action.params?.path) {
-          alert(`Navigation to: ${action.params.path}`);
+          const targetPage = pages.find(p => p.path === action.params.path);
+          if (targetPage) {
+            setCurrentPage(targetPage.id);
+            showNotification(`Navigated to ${targetPage.name}`, 'success');
+          } else {
+            showNotification(`Navigation: ${action.params.path}`, 'info');
+          }
         }
         break;
 
       case 'alert':
         if (action.params?.message) {
-          alert(action.params.message);
+          showNotification(action.params.message, 'info');
         }
         break;
 
@@ -107,12 +131,111 @@ export function PreviewMode({ components, projectName, workflows = [], pages = [
           const component = components.find(c => c.id === action.target);
           const state = componentStates[action.target];
           if (component && state) {
-            if (!state.value || state.value.trim() === '') {
-              alert(`Validation failed: ${component.placeholder || 'Field'} is required`);
+            const value = state.value || formData[action.target];
+            if (!value || value.trim() === '') {
+              setComponentStates(prev => ({
+                ...prev,
+                [action.target]: { 
+                  ...prev[action.target], 
+                  error: `${component.placeholder || 'Field'} is required` 
+                }
+              }));
+              showNotification(`Validation failed: ${component.placeholder || 'Field'} is required`, 'error');
             } else {
-              alert('Validation passed!');
+              setComponentStates(prev => ({
+                ...prev,
+                [action.target]: { ...prev[action.target], error: null }
+              }));
+              showNotification(`Validation passed!`, 'success');
             }
           }
+        }
+        break;
+
+      case 'submitForm':
+        // Validate all form fields first
+        let hasErrors = false;
+        const formComponents = components.filter(c => c.type === 'Input');
+        
+        formComponents.forEach(comp => {
+          const value = componentStates[comp.id]?.value || formData[comp.id];
+          if (!value || value.trim() === '') {
+            hasErrors = true;
+            setComponentStates(prev => ({
+              ...prev,
+              [comp.id]: { 
+                ...prev[comp.id], 
+                error: `${comp.placeholder || 'Field'} is required` 
+              }
+            }));
+          }
+        });
+
+        if (!hasErrors) {
+          showNotification('Form submitted successfully! ✓', 'success');
+          console.log('Form data:', formData);
+          
+          // Reset form
+          setFormData({});
+          const resetStates = {};
+          formComponents.forEach(comp => {
+            resetStates[comp.id] = { ...componentStates[comp.id], value: '', error: null };
+          });
+          setComponentStates(prev => ({ ...prev, ...resetStates }));
+        } else {
+          showNotification('Please fill all required fields', 'error');
+        }
+        break;
+
+      case 'clearForm':
+        setFormData({});
+        const clearedStates = {};
+        components.filter(c => c.type === 'Input').forEach(comp => {
+          clearedStates[comp.id] = { ...componentStates[comp.id], value: '', error: null };
+        });
+        setComponentStates(prev => ({ ...prev, ...clearedStates }));
+        showNotification('Form cleared', 'info');
+        break;
+
+      case 'toggleComponent':
+        if (action.target) {
+          setComponentStates(prev => ({
+            ...prev,
+            [action.target]: { 
+              ...prev[action.target], 
+              visible: !prev[action.target]?.visible 
+            }
+          }));
+        }
+        break;
+
+      case 'setLoading':
+        if (action.target) {
+          setComponentStates(prev => ({
+            ...prev,
+            [action.target]: { 
+              ...prev[action.target], 
+              loading: action.params?.loading ?? true 
+            }
+          }));
+        }
+        break;
+
+      case 'disable':
+        if (action.target) {
+          setComponentStates(prev => ({
+            ...prev,
+            [action.target]: { ...prev[action.target], disabled: true }
+          }));
+        }
+        break;
+
+      case 'enable':
+        if (action.target) {
+          setComponentStates(prev => ({
+            ...prev,
+            [action.target]: { ...prev[action.target], disabled: false }
+          }));
         }
         break;
 
@@ -121,24 +244,38 @@ export function PreviewMode({ components, projectName, workflows = [], pages = [
     }
   };
 
-  const executeWorkflowsByTrigger = (triggerType, componentId = null) => {
+  const executeWorkflowsByTrigger = (triggerType, componentId = null, eventData = {}) => {
     const matchingWorkflows = workflows.filter(workflow => {
       if (workflow.trigger.type !== triggerType) return false;
       if (triggerType === 'load') return true;
       return workflow.trigger.componentId === componentId;
     });
 
+    console.log(`🔍 Found ${matchingWorkflows.length} workflows for trigger:`, triggerType, componentId);
     matchingWorkflows.forEach(workflow => {
-      executeWorkflow(workflow);
+      executeWorkflow(workflow, eventData);
     });
   };
 
-  const handleComponentClick = (componentId) => {
-    executeWorkflowsByTrigger('click', componentId);
+  const handleComponentClick = (component) => {
+    console.log('👆 Component clicked:', component.id, component.type);
+    executeWorkflowsByTrigger('click', component.id, { component });
   };
 
-  const handleComponentSubmit = (componentId) => {
-    executeWorkflowsByTrigger('submit', componentId);
+  const handleComponentSubmit = (component) => {
+    console.log('📤 Form submitted:', component.id);
+    executeWorkflowsByTrigger('submit', component.id, { formData });
+  };
+
+  const handleInputChange = (componentId, value) => {
+    setComponentStates(prev => ({
+      ...prev,
+      [componentId]: { ...prev[componentId], value, error: null }
+    }));
+    setFormData(prev => ({
+      ...prev,
+      [componentId]: value
+    }));
   };
 
   const renderComponent = (component) => {
@@ -153,6 +290,10 @@ export function PreviewMode({ components, projectName, workflows = [], pages = [
       height: component.height,
     };
 
+    const hasError = state.error;
+    const isLoading = state.loading;
+    const isDisabled = state.disabled;
+
     switch (component.type) {
       case 'Button':
         return (
@@ -160,19 +301,25 @@ export function PreviewMode({ components, projectName, workflows = [], pages = [
             key={component.id}
             style={{
               ...style,
-              backgroundColor: component.color,
+              backgroundColor: isLoading ? '#9ca3af' : component.color,
               color: component.textColor,
               borderRadius: '6px',
               border: 'none',
               fontSize: component.fontSize,
               fontWeight: 500,
-              cursor: 'pointer',
+              cursor: isDisabled || isLoading ? 'not-allowed' : 'pointer',
+              opacity: isDisabled ? 0.5 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
             }}
-            onClick={() => {
-              handleComponentClick(component.id);
-              alert(`Button "${component.text}" clicked!`);
-            }}
+            onClick={() => !isDisabled && !isLoading && handleComponentClick(component)}
+            disabled={isDisabled || isLoading}
           >
+            {isLoading && (
+              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+            )}
             {component.text}
           </button>
         );
@@ -189,36 +336,47 @@ export function PreviewMode({ components, projectName, workflows = [], pages = [
               alignItems: 'center',
             }}
           >
-            {component.text}
+            {state.value || component.text}
           </div>
         );
 
       case 'Input':
         return (
-          <input
-            key={component.id}
-            placeholder={component.placeholder}
-            value={state.value}
-            onChange={(e) => {
-              setComponentStates(prev => ({
-                ...prev,
-                [component.id]: { ...prev[component.id], value: e.target.value }
-              }));
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                handleComponentSubmit(component.id);
-              }
-            }}
-            style={{
-              ...style,
-              padding: '8px',
-              border: `1px solid ${component.borderColor}`,
-              borderRadius: '6px',
-              backgroundColor: component.backgroundColor,
-              fontSize: 14,
-            }}
-          />
+          <div key={component.id} style={style}>
+            <input
+              placeholder={component.placeholder}
+              value={state.value}
+              onChange={(e) => handleInputChange(component.id, e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleComponentSubmit(component);
+                }
+              }}
+              disabled={isDisabled}
+              style={{
+                width: '100%',
+                height: '100%',
+                padding: '8px',
+                border: hasError ? '2px solid #ef4444' : `1px solid ${component.borderColor}`,
+                borderRadius: '6px',
+                backgroundColor: component.backgroundColor,
+                fontSize: 14,
+                outline: 'none',
+              }}
+            />
+            {hasError && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                marginTop: '4px',
+                fontSize: '12px',
+                color: '#ef4444'
+              }}>
+                {state.error}
+              </div>
+            )}
+          </div>
         );
 
       case 'Container':
@@ -251,22 +409,28 @@ export function PreviewMode({ components, projectName, workflows = [], pages = [
 
       case 'Checkbox':
         return (
-          <input
-            key={component.id}
-            type="checkbox"
-            checked={state.checked}
-            onChange={(e) => {
-              setComponentStates(prev => ({
-                ...prev,
-                [component.id]: { ...prev[component.id], checked: e.target.checked }
-              }));
-              handleComponentClick(component.id);
-            }}
-            style={{
-              ...style,
-              cursor: 'pointer',
-            }}
-          />
+          <div key={component.id} style={style} className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={state.checked}
+              onChange={(e) => {
+                setComponentStates(prev => ({
+                  ...prev,
+                  [component.id]: { ...prev[component.id], checked: e.target.checked }
+                }));
+                handleComponentClick(component);
+              }}
+              disabled={isDisabled}
+              style={{
+                width: '20px',
+                height: '20px',
+                cursor: isDisabled ? 'not-allowed' : 'pointer',
+              }}
+            />
+            {component.label && (
+              <span style={{ fontSize: '14px', color: '#374151' }}>{component.label}</span>
+            )}
+          </div>
         );
 
       case 'Radio':
@@ -280,11 +444,12 @@ export function PreviewMode({ components, projectName, workflows = [], pages = [
                 ...prev,
                 [component.id]: { ...prev[component.id], checked: e.target.checked }
               }));
-              handleComponentClick(component.id);
+              handleComponentClick(component);
             }}
+            disabled={isDisabled}
             style={{
               ...style,
-              cursor: 'pointer',
+              cursor: isDisabled ? 'not-allowed' : 'pointer',
             }}
           />
         );
@@ -312,6 +477,7 @@ export function PreviewMode({ components, projectName, workflows = [], pages = [
               padding: '16px',
               boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
             }}
+            onClick={() => handleComponentClick(component)}
           >
             <div style={{ fontSize: '18px', fontWeight: 600, marginBottom: '8px' }}>
               {component.title || 'Card Title'}
@@ -319,65 +485,6 @@ export function PreviewMode({ components, projectName, workflows = [], pages = [
             <div style={{ fontSize: '14px', color: '#6b7280' }}>
               {component.content || 'Card content goes here'}
             </div>
-          </div>
-        );
-
-      case 'Table':
-        return (
-          <div
-            key={component.id}
-            style={{
-              ...style,
-              backgroundColor: component.backgroundColor,
-              border: component.border,
-              overflow: 'auto',
-            }}
-          >
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#f9fafb' }}>
-                  <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>Name</th>
-                  <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>Email</th>
-                  <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[1, 2, 3].map(i => (
-                  <tr key={i}>
-                    <td style={{ padding: '8px', borderBottom: '1px solid #e5e7eb' }}>User {i}</td>
-                    <td style={{ padding: '8px', borderBottom: '1px solid #e5e7eb' }}>user{i}@example.com</td>
-                    <td style={{ padding: '8px', borderBottom: '1px solid #e5e7eb' }}>Active</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        );
-
-      case 'List':
-        return (
-          <div
-            key={component.id}
-            style={{
-              ...style,
-              backgroundColor: component.bg,
-              border: component.border,
-              overflow: 'auto',
-              padding: '8px',
-            }}
-          >
-            {['Item 1', 'Item 2', 'Item 3', 'Item 4'].map((item, i) => (
-              <div
-                key={i}
-                style={{
-                  padding: '12px',
-                  borderBottom: i < 3 ? '1px solid #e5e7eb' : 'none',
-                  fontSize: '14px',
-                }}
-              >
-                {item}
-              </div>
-            ))}
           </div>
         );
 
@@ -433,6 +540,7 @@ export function PreviewMode({ components, projectName, workflows = [], pages = [
               backgroundColor: component.bg || component.backgroundColor,
               borderRadius: component.borderRadius || 0,
             }}
+            onClick={() => handleComponentClick(component)}
           >
             {component.type}
           </div>
@@ -445,9 +553,8 @@ export function PreviewMode({ components, projectName, workflows = [], pages = [
       {/* Header */}
       <div className="h-14 bg-gray-900 border-b border-gray-700 flex items-center justify-between px-4">
         <div className="flex items-center gap-4">
-          <h2 className="text-white font-semibold">{projectName} - Preview</h2>
+          <h2 className="text-white font-semibold">{projectName} - Live Preview</h2>
           
-          {/* Workflow Indicator */}
           {workflows && workflows.length > 0 && (
             <span className="px-2 py-1 bg-green-600 text-white text-xs rounded-full flex items-center gap-1">
               <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span>
@@ -455,7 +562,6 @@ export function PreviewMode({ components, projectName, workflows = [], pages = [
             </span>
           )}
           
-          {/* Viewport Selector */}
           <div className="flex items-center gap-1 bg-gray-800 rounded-lg p-1">
             {Object.entries(viewportSizes).map(([key, { icon: Icon }]) => (
               <button
@@ -489,6 +595,24 @@ export function PreviewMode({ components, projectName, workflows = [], pages = [
             <X className="w-5 h-5" />
           </button>
         </div>
+      </div>
+
+      {/* Notifications */}
+      <div className="fixed top-20 right-4 z-50 space-y-2">
+        {notifications.map(notif => (
+          <div
+            key={notif.id}
+            className={`px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-in slide-in-from-right duration-300 ${
+              notif.type === 'error' ? 'bg-red-600 text-white' :
+              notif.type === 'success' ? 'bg-green-600 text-white' :
+              'bg-blue-600 text-white'
+            }`}
+          >
+            {notif.type === 'success' && <CheckCircle className="w-5 h-5" />}
+            {notif.type === 'error' && <AlertCircle className="w-5 h-5" />}
+            <span className="text-sm font-medium">{notif.message}</span>
+          </div>
+        ))}
       </div>
 
       {/* Preview Area */}
@@ -526,7 +650,7 @@ export function PreviewMode({ components, projectName, workflows = [], pages = [
 
       {/* Info Bar */}
       <div className="h-10 bg-gray-900 border-t border-gray-700 flex items-center justify-between px-4 text-sm text-gray-400">
-        <span>{components.length} components • {workflows?.length || 0} workflows</span>
+        <span>{components.length} components • {workflows?.length || 0} workflows • {Object.keys(formData).length} form fields</span>
         <span>
           {viewportSizes[viewport].width} × {viewportSizes[viewport].height}
         </span>
