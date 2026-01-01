@@ -17,7 +17,6 @@ export function AIChatPanel({ isOpen, onClose, onComponentsGenerated, existingCo
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const messagesEndRef = useRef(null);
-  const API_URL=import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

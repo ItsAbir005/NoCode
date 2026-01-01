@@ -15,8 +15,6 @@ export function WorkflowBuilder({ workflows, onWorkflowsChange, components }) {
     actions: []
   });
 
-  const API_URL=import.meta.env.VITE_API_URL || 'http://localhost:8000';
-
   const triggerTypes = [
     { value: 'click', label: 'On Click', icon: MousePointer },
     { value: 'submit', label: 'On Submit', icon: Save },
