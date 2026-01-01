@@ -3,8 +3,12 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "build": "npx prisma generate",
-    "start": "node src/index.js"
+    "build": "npx prisma generate --schema=./prisma/schema.prisma",
+    "start": "node src/index.js",
+    "migrate": "npx prisma migrate deploy --schema=./prisma/schema.prisma"
+  },
+  "prisma": {
+    "schema": "prisma/schema.prisma"
   },
   "keywords": [],
   "author": "",
